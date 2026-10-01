@@ -11,6 +11,7 @@ struct HoverButton: View {
     var icon: String
     var iconColor: Color = .primary
     var scale: Image.Scale = .medium
+    var badgeIcon: String? = nil
     var action: () -> Void
     var contentTransition: ContentTransition = .symbolEffect
 
@@ -33,6 +34,14 @@ struct HoverButton: View {
                                 .foregroundColor(iconColor)
                                 .contentTransition(contentTransition)
                                 .font(scale == .large ? .largeTitle : .body)
+                                .overlay(alignment: .topTrailing) {
+                                    if let badgeIcon {
+                                        Image(systemName: badgeIcon)
+                                            .font(.system(size: 8, weight: .bold))
+                                            .foregroundStyle(iconColor)
+                                            .offset(x: 7, y: -5)
+                                    }
+                                }
                         }
                 }
         }

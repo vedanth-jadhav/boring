@@ -30,6 +30,8 @@ struct CompactHomeView: View {
     let albumArtNamespace: Namespace.ID
     let horizontalMediaGestureFeedback: CGFloat
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var lyricContentHeight: CGFloat = 16.5
     @State private var sliderValue: Double = 0
     @State private var dragging: Bool = false
     @State private var lastDragged: Date = .distantPast
@@ -39,6 +41,7 @@ struct CompactHomeView: View {
     @Default(.musicControlSlotLimit) private var slotLimit
     @Default(.playerColorTinting) private var playerColorTinting
     @Default(.showRemainingTime) private var showRemainingTime
+    @Default(.enableLyrics) private var enableLyrics
 
     private let albumArtWidth: CGFloat = 45
     private let headerSpacing: CGFloat = 10
@@ -54,7 +57,7 @@ struct CompactHomeView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-                .frame(height: albumArtWidth)
+                .frame(height: max(albumArtWidth, enableLyrics ? 30 + lyricContentHeight : 28))
 
             progressRow
                 .padding(.top, 6)
@@ -87,21 +90,21 @@ struct CompactHomeView: View {
                 compactAlbumArt
 
                 VStack(alignment: .leading, spacing: 1) {
-                    MarqueeText(
-                        musicManager.songTitle,
-                        font: .system(size: 12, weight: .semibold),
-                        color: .white,
-                        frameWidth: textWidth
-                    )
-
-                    Text(musicManager.artistName)
-                        .font(.system(size: 10))
-                        .foregroundStyle(
-                            playerColorTinting
-                                ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6)
-                                : .gray
-                        )
-                        .lineLimit(1)
+                    SmoothTrackText(text: musicManager.songTitle, font: .system(size: 12, weight: .semibold),
+                                    color: .white, width: textWidth, height: 15)
+                    SmoothTrackText(text: musicManager.artistName, font: .system(size: 10),
+                                    color: playerColorTinting
+                                        ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6) : .gray,
+                                    width: textWidth, height: 13)
+                    if enableLyrics {
+                        KaraokeLyricsView(width: textWidth, pointSize: 10)
+                            .background {
+                                GeometryReader { proxy in
+                                    Color.clear.preference(key: LyricHeightPreferenceKey.self, value: proxy.size.height)
+                                }
+                            }
+                            .onPreferenceChange(LyricHeightPreferenceKey.self) { lyricContentHeight = $0 }
+                    }
                 }
                 .frame(width: textWidth, alignment: .leading)
 
@@ -193,16 +196,21 @@ struct CompactHomeView: View {
 
     private var compactAlbumArt: some View {
         ZStack(alignment: .bottomTrailing) {
-            Image(nsImage: musicManager.albumArt)
-                .resizable().scaledToFill()
-                .frame(width: albumArtWidth, height: albumArtWidth)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+            ZStack {
+                Image(nsImage: musicManager.albumArt)
+                    .resizable().scaledToFill()
+                    .frame(width: albumArtWidth, height: albumArtWidth)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .id(ObjectIdentifier(musicManager.albumArt))
+                    .transition(.opacity)
+            }
+            .animation(.timingCurve(0.22, 1, 0.36, 1, duration: reduceMotion ? 0.15 : 0.65), value: ObjectIdentifier(musicManager.albumArt))
 
             // Badge scaled to this art. AlbumArtView's is a fixed 30pt with
             // a +10/+10 offset, sized for the 120pt art in the full layout —
             // on 50pt art it spills outside the corner.
             if !musicManager.usingAppIconForArtwork {
-                appIcon(for: musicManager.bundleIdentifier ?? MediaAppBundleID.appleMusic)
+                musicManager.sourceIcon
                     .resizable().scaledToFit()
                     .frame(width: 18, height: 18)
                     .offset(x: 5, y: 5)

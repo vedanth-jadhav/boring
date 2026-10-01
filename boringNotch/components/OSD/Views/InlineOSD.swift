@@ -95,6 +95,7 @@ struct InlineOSD: View {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     InlineOSD(type: .constant(.brightness), value: .constant(0.4), icon: .constant(""), accent: .constant(nil), hoverAnimation: .constant(false), gestureProgress: .constant(0))
         .padding(.horizontal, 8)
@@ -102,3 +103,4 @@ struct InlineOSD: View {
         .padding()
         .environmentObject(BoringViewModel(camera: CameraModel()))
 }
+#endif

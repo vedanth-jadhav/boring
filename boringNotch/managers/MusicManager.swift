@@ -96,10 +96,16 @@ final class MusicManager: ObservableObject {
     @Published var timestampDate: Date = .init()
     @Published var playbackRate: Double = 1
     @Published var isShuffled: Bool = false
+    @Published var isSmartShuffled: Bool = false
     @Published var repeatMode: RepeatMode = .off
     @Published var volume: Double = 0.5
     @Published var volumeControlSupported: Bool = true
     @Published var usingAppIconForArtwork: Bool = false
+    var sourceIcon: Image {
+        effectiveMediaController == .octave
+            ? Image("Octave")
+            : appIcon(for: bundleIdentifier ?? MediaAppBundleID.appleMusic)
+    }
     @Published var canFavoriteTrack: Bool = false
 
     // Lyrics are now managed by LyricsService
@@ -343,6 +349,8 @@ final class MusicManager: ObservableObject {
             SpotifyController()
         case .youtubeMusic:
             YouTubeMusicController()
+        case .octave:
+            OctaveController()
         }
     }
 
@@ -410,6 +418,7 @@ final class MusicManager: ObservableObject {
         timestampDate = Date()
         playbackRate = 1
         isShuffled = false
+        isSmartShuffled = false
         repeatMode = .off
         volume = 0.5
         usingAppIconForArtwork = false
@@ -507,7 +516,9 @@ final class MusicManager: ObservableObject {
                 self.updateArtwork(artwork)
             } else if state.artwork == nil {
                 // Try to use app icon if no artwork but track changed
-                if let appIconImage = appIconAsNSImage(for: state.bundleIdentifier) {
+                let appIconImage = effectiveMediaController == .octave
+                    ? NSImage(named: "Octave") : appIconAsNSImage(for: state.bundleIdentifier)
+                if let appIconImage {
                     self.usingAppIconForArtwork = true
                     self.updateAlbumArt(newAlbumArt: appIconImage)
                 } else {
@@ -517,13 +528,10 @@ final class MusicManager: ObservableObject {
             }
             self.artworkData = state.artwork
 
-            if artworkChanged || state.artwork == nil {
-                // Update last artwork change values
-                self.lastArtworkTitle = state.title
-                self.lastArtworkArtist = state.artist
-                self.lastArtworkAlbum = state.album
-                self.lastArtworkBundleIdentifier = state.bundleIdentifier
-            }
+            self.lastArtworkTitle = state.title
+            self.lastArtworkArtist = state.artist
+            self.lastArtworkAlbum = state.album
+            self.lastArtworkBundleIdentifier = state.bundleIdentifier
 
             // Only update sneak peek if there's actual content and something changed
             if !state.title.isEmpty && !state.artist.isEmpty && state.isPlaying {
@@ -541,16 +549,12 @@ final class MusicManager: ObservableObject {
         let repeatModeChanged = state.repeatMode != self.repeatMode
         let volumeChanged = state.volume != self.volume
 
-        if state.title != self.songTitle {
-            self.songTitle = state.title
-        }
-
-        if state.artist != self.artistName {
-            self.artistName = state.artist
-        }
-
-        if state.album != self.album {
-            self.album = state.album
+        if state.title != self.songTitle || state.artist != self.artistName || state.album != self.album {
+            withAnimation(.easeInOut(duration: 0.28)) {
+                self.songTitle = state.title
+                self.artistName = state.artist
+                self.album = state.album
+            }
         }
 
         if timeChanged {
@@ -567,6 +571,9 @@ final class MusicManager: ObservableObject {
 
         if shuffleChanged {
             self.isShuffled = state.isShuffled
+        }
+        if state.isSmartShuffled != self.isSmartShuffled {
+            self.isSmartShuffled = state.isSmartShuffled
         }
 
         if state.bundleIdentifier != self.bundleIdentifier {
@@ -596,7 +603,10 @@ final class MusicManager: ObservableObject {
         // every no-op stream event invalidates the whole view tree. A pause/
         // resume must rebase it too, or the estimate overshoots by the pause
         // duration.
-        if timeChanged || playbackRateChanged || playingStateChanged {
+        // Octave can send a corrected clock anchor while currentTime is
+        // unchanged (for example during buffering). Rebase that sample too.
+        let octaveClockRebased = effectiveMediaController == .octave && state.lastUpdated != timestampDate
+        if timeChanged || playbackRateChanged || playingStateChanged || octaveClockRebased {
             self.timestampDate = state.lastUpdated
         }
     }
@@ -633,7 +643,10 @@ final class MusicManager: ObservableObject {
         }
 
         Task { @MainActor in
-            await lyricsService.fetchLyrics(bundleIdentifier: bundleIdentifier, title: title, artist: artist)
+            await lyricsService.fetchLyrics(
+                bundleIdentifier: bundleIdentifier, title: title, artist: artist,
+                preferProvider: effectiveMediaController == .octave
+            )
         }
     }
 

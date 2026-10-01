@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Boring Notch Octave Bridge",
+  "version": "1.0.0",
+  "description": "Connects the Octave player in Brave to the local Boring Notch app.",
+  "permissions": [
+    "nativeMessaging",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://music.octavestreaming.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://music.octavestreaming.com/*"
+      ],
+      "js": [
+        "page.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://music.octavestreaming.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4U/IgS4vglOmpS5nnFnzwGnVK15oUer9/UV0kAfzQgR1usYk8J8mX6b24HaIYvRM4bTv8RP+u+RZiUEhymMA5Xd1e5xqN7E4H4yRcEkUZRI81mRP0gEPuOeqSlfyhIqtv674ovoRTy1c+YA70uV/ezPICcL/jK+oecmDUi0D3StE7I0C9tbx+J7j25r4zpIIrlTpCR2w+zOQgyaDlZgeHrPM2UZuwv63LYRaDD9kXV2Sq0lowKYSr4n6tYr5OhMQ0u+Dv2gASzrJhnJf9e4sMNf6B/PxbxZ7MSUNdOBPTxZNWzBDrWgfLYuxMZkMUrKX2is15KFPkjtt4ffZSgSILQIDAQAB"
+}

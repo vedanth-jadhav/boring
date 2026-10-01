@@ -16,26 +16,34 @@ final class LyricsService: ObservableObject {
     @Published var currentLyrics: String = ""
     @Published var isFetchingLyrics: Bool = false
     @Published var syncedLyrics: [(time: Double, text: String)] = []
+    @Published private(set) var timedLyrics: [LyricLine] = [] {
+        didSet { timeline = LyricTimeline(lines: timedLyrics) }
+    }
+    private var timeline = LyricTimeline(lines: [])
 
     // Cache to avoid redundant fetches; NSCache evicts under memory pressure
     // instead of growing for the whole session.
     private final class LyricsEntry {
         let plain: String
         let synced: [(time: Double, text: String)]
-        init(plain: String, synced: [(time: Double, text: String)]) {
+        let timed: [LyricLine]
+        init(plain: String, synced: [(time: Double, text: String)], timed: [LyricLine]? = nil) {
             self.plain = plain
             self.synced = synced
+            self.timed = timed ?? synced.map { LyricLine(start: $0.time, end: nil, text: $0.text) }
         }
     }
     private let lyricsCache = NSCache<NSString, LyricsEntry>()
     private var currentFetchTask: Task<Void, Never>?
+    private var activeCacheKey: String?
 
     private init() {}
 
     // MARK: - Public API
 
     /// Fetches lyrics for the given track, preferring native Apple Music lyrics when available.
-    func fetchLyrics(bundleIdentifier: String?, title: String, artist: String) async {
+    func fetchLyrics(bundleIdentifier: String?, title: String, artist: String,
+                     preferProvider: Bool = false) async {
         // Cancel any pending fetch
         currentFetchTask?.cancel()
 
@@ -46,9 +54,11 @@ final class LyricsService: ObservableObject {
 
         // Check cache first
         let cacheKey = cacheKey(title: title, artist: artist)
+        activeCacheKey = cacheKey
         if let cached = lyricsCache.object(forKey: cacheKey as NSString) {
             currentLyrics = cached.plain
             syncedLyrics = cached.synced
+            timedLyrics = cached.timed
             isFetchingLyrics = false
             return
         }
@@ -56,9 +66,18 @@ final class LyricsService: ObservableObject {
         isFetchingLyrics = true
         currentLyrics = ""
         syncedLyrics = []
+        timedLyrics = []
 
         let task = Task { [weak self] in
             guard let self = self else { return }
+
+            // Octave's page asks its own lyrics endpoint once per track. Give
+            // that response first choice; a single timeout keeps the existing
+            // web source available if the page has no lyrics or disconnects.
+            if preferProvider {
+                do { try await Task.sleep(for: .seconds(2)) }
+                catch { return }
+            }
 
             // Try Apple Music first if applicable
             if let bundleIdentifier = bundleIdentifier, bundleIdentifier.contains(MediaAppBundleID.appleMusic) {
@@ -67,6 +86,7 @@ final class LyricsService: ObservableObject {
                     await MainActor.run {
                         self.currentLyrics = lyrics
                         self.syncedLyrics = []
+                        self.timedLyrics = []
                         self.isFetchingLyrics = false
                         self.lyricsCache.setObject(LyricsEntry(plain: lyrics, synced: []), forKey: cacheKey as NSString)
                     }
@@ -80,11 +100,13 @@ final class LyricsService: ObservableObject {
 
             guard !Task.isCancelled else { return }
             await MainActor.run {
+                guard self.activeCacheKey == cacheKey else { return }
                 self.currentLyrics = webResult.plain
                 self.syncedLyrics = webResult.synced
+                self.timedLyrics = webResult.timed
                 self.isFetchingLyrics = false
                 if !webResult.plain.isEmpty {
-                    self.lyricsCache.setObject(LyricsEntry(plain: webResult.plain, synced: webResult.synced), forKey: cacheKey as NSString)
+                    self.lyricsCache.setObject(LyricsEntry(plain: webResult.plain, synced: webResult.synced, timed: webResult.timed), forKey: cacheKey as NSString)
                 }
             }
         }
@@ -97,9 +119,59 @@ final class LyricsService: ObservableObject {
     func clearLyrics() {
         currentFetchTask?.cancel()
         currentFetchTask = nil
+        activeCacheKey = nil
         currentLyrics = ""
         syncedLyrics = []
+        timedLyrics = []
         isFetchingLyrics = false
+    }
+
+    /// Retain Octave's absolute word timestamps, including instrumental gaps.
+    func setProviderLyrics(_ lines: [LyricLine], plainLyrics: String = "", title: String, artist: String) {
+        let key = cacheKey(title: title, artist: artist)
+        let sorted = lines.filter { $0.start.isFinite && $0.start >= 0 }.map { line in
+            let words = line.words.filter {
+                $0.start.isFinite && $0.end.isFinite && $0.start >= line.start && $0.end > $0.start
+                    && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }.map {
+                LyricLine.Word(text: $0.text.trimmingCharacters(in: .whitespacesAndNewlines), start: $0.start, end: $0.end, isBackground: $0.isBackground)
+            }
+            return LyricLine(start: line.start, end: line.end.flatMap { $0.isFinite && $0 > line.start ? $0 : nil },
+                             text: line.text, words: words.count == line.words.count ? words : [], isBackground: line.isBackground)
+        }.sorted { $0.start < $1.start }
+        let plain = sorted.isEmpty ? plainLyrics : sorted.map(\.text).joined(separator: "\n")
+        guard !plain.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        // A later line-only response must not discard a richer cached alignment.
+        if let cached = lyricsCache.object(forKey: key as NSString),
+           cached.timed.contains(where: { !$0.words.isEmpty }),
+           !sorted.contains(where: { !$0.words.isEmpty }) { return }
+        let synced = sorted.map { (time: $0.start, text: $0.text) }
+        lyricsCache.setObject(LyricsEntry(plain: plain, synced: synced, timed: sorted), forKey: key as NSString)
+        guard activeCacheKey == key else { return }
+        guard timedLyrics != sorted || currentLyrics != plain else { return }
+        currentFetchTask?.cancel()
+        currentFetchTask = nil
+        currentLyrics = plain
+        syncedLyrics = synced
+        timedLyrics = sorted
+        isFetchingLyrics = false
+    }
+
+    /// Return every concurrent vocal, preserving simultaneous line timestamps.
+    func activeLines(at elapsed: Double, duration: Double) -> [LyricTimeline.Entry] {
+        timeline.active(at: elapsed, duration: duration)
+    }
+
+    func displayedLines(at elapsed: Double, duration: Double) -> [LyricTimeline.Entry] {
+        timeline.displayed(at: elapsed, duration: duration)
+    }
+
+    /// Constant within a track so controls don't jump during backing vocals.
+    var hasConcurrentVocals: Bool { timeline.hasConcurrentVocals }
+
+    func timedLine(at elapsed: Double) -> (line: LyricLine, nextStart: Double?)? {
+        guard let context = activeLines(at: elapsed, duration: .greatestFiniteMagnitude).first else { return nil }
+        return (context.line, context.nextStart)
     }
 
     /// Returns the lyric line at the given elapsed time for synced lyrics.
@@ -110,24 +182,8 @@ final class LyricsService: ObservableObject {
     /// Returns the active synced lyric line and its timing window.
     func lyricLineContext(at elapsed: Double) -> (text: String, startTime: Double, endTime: Double?) {
         guard !syncedLyrics.isEmpty else { return (currentLyrics, 0, nil) }
-
-        // Binary search for last line with time <= elapsed
-        var low = 0
-        var high = syncedLyrics.count - 1
-        var idx = 0
-        while low <= high {
-            let mid = (low + high) / 2
-            if syncedLyrics[mid].time <= elapsed {
-                idx = mid
-                low = mid + 1
-            } else {
-                high = mid - 1
-            }
-        }
-
-        let nextIndex = syncedLyrics.index(after: idx)
-        let endTime = nextIndex < syncedLyrics.endIndex ? syncedLyrics[nextIndex].time : nil
-        return (syncedLyrics[idx].text, syncedLyrics[idx].time, endTime)
+        guard let context = timedLine(at: elapsed) else { return ("", 0, nil) }
+        return (context.line.text, context.line.start, context.line.end ?? context.nextStart)
     }
 
     // MARK: - Private Methods
@@ -175,12 +231,12 @@ final class LyricsService: ObservableObject {
         return nil
     }
 
-    private func fetchLyricsFromWeb(title: String, artist: String) async -> (plain: String, synced: [(time: Double, text: String)]) {
+    private func fetchLyricsFromWeb(title: String, artist: String) async -> (plain: String, synced: [(time: Double, text: String)], timed: [LyricLine]) {
         let cleanTitle = normalizedQuery(title)
         let cleanArtist = normalizedQuery(artist)
 
         guard let encodedTitle = cleanTitle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
-            return ("", [])
+            return ("", [], [])
         }
 
         // Try with artist first, then without if no results
@@ -218,8 +274,9 @@ final class LyricsService: ObservableObject {
 
                     if !plain.isEmpty || !synced.isEmpty {
                         let resolvedPlain = plain.isEmpty ? synced : plain
-                        let parsedSynced = synced.isEmpty ? [] : parseLRC(synced)
-                        return (resolvedPlain, parsedSynced)
+                        let timed = LyricLine.parseLRC(synced)
+                        let parsedSynced = timed.map { (time: $0.start, text: $0.text) }
+                        return (resolvedPlain, parsedSynced, timed)
                     }
                 }
             } catch {
@@ -227,7 +284,7 @@ final class LyricsService: ObservableObject {
             }
         }
 
-        return ("", [])
+        return ("", [], [])
     }
 
     /// Find the best matching result from the search results based on title similarity
@@ -280,43 +337,6 @@ final class LyricsService: ObservableObject {
         }
 
         return bestResult ?? results.first
-    }
-
-    // MARK: - Synced lyrics helpers
-
-    private func parseLRC(_ lrc: String) -> [(time: Double, text: String)] {
-        var result: [(Double, String)] = []
-        let pattern = #"\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
-
-        for lineSub in lrc.split(separator: "\n") {
-            let line = String(lineSub)
-            let nsLine = line as NSString
-
-            guard let match = regex.firstMatch(in: line, range: NSRange(location: 0, length: nsLine.length)) else {
-                continue
-            }
-
-            let minStr = nsLine.substring(with: match.range(at: 1))
-            let secStr = nsLine.substring(with: match.range(at: 2))
-            let msRange = match.range(at: 3)
-            let msStr = msRange.location != NSNotFound ? nsLine.substring(with: msRange) : "0"
-
-            let minutes = Double(minStr) ?? 0
-            let seconds = Double(secStr) ?? 0
-            // Handle both centiseconds (2 digits) and milliseconds (3 digits)
-            let msValue = Double(msStr) ?? 0
-            let msDivisor = msStr.count == 3 ? 1000.0 : 100.0
-            let time = minutes * 60 + seconds + msValue / msDivisor
-
-            let textStart = match.range.location + match.range.length
-            let text = nsLine.substring(from: textStart).trimmingCharacters(in: .whitespaces)
-            if !text.isEmpty {
-                result.append((time, text))
-            }
-        }
-
-        return result.sorted { $0.0 < $1.0 }
     }
 
     private func normalizedQuery(_ string: String) -> String {

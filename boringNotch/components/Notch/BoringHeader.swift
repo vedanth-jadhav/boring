@@ -118,6 +118,8 @@ struct BoringHeader: View {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     BoringHeader().environmentObject(BoringViewModel(camera: CameraModel()))
 }
+#endif

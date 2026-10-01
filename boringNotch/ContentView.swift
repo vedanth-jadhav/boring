@@ -35,6 +35,7 @@ struct ContentView: View {
 
     @State private var haptics: Bool = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace var albumArtNamespace
 
     @Default(.showNotHumanFace) var showNotHumanFace
@@ -524,7 +525,7 @@ struct ContentView: View {
                                    HStack(alignment: .center) {
                                        Image(systemName: "music.note")
                                        GeometryReader { geo in
-                                           MarqueeText(musicManager.songTitle + " - " + musicManager.artistName, color: Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6) : .gray, delayDuration: 1.0, frameWidth: geo.size.width)
+                                           SmoothTrackText(text: musicManager.songTitle + " - " + musicManager.artistName, font: .body, color: Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6) : .gray, width: geo.size.width, height: NSFont.preferredFont(forTextStyle: .body).pointSize * 1.3, delayDuration: 1.0)
                                        }
                                    }
                                    .foregroundStyle(.gray)
@@ -701,18 +702,17 @@ struct ContentView: View {
                 return base
             }()
 
-            Image(nsImage: musicManager.albumArt)
-                .resizable().scaledToFit()
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: closedCornerRadius)
-                )
-                .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-                .frame(
-                    width: scaledArtSize,
-                    height: scaledArtSize
-                )
-                .offset(x: artVerticalInset - liveActivityEdgeMargin)
+            ZStack {
+                Image(nsImage: musicManager.albumArt)
+                    .resizable().scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: closedCornerRadius))
+                    .id(ObjectIdentifier(musicManager.albumArt))
+                    .transition(.opacity)
+            }
+            .animation(.timingCurve(0.22, 1, 0.36, 1, duration: reduceMotion ? 0.15 : 0.65), value: ObjectIdentifier(musicManager.albumArt))
+            .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
+            .frame(width: scaledArtSize, height: scaledArtSize)
+            .offset(x: artVerticalInset - liveActivityEdgeMargin)
 
             Rectangle()
                 .fill(.black)
@@ -723,12 +723,13 @@ struct ContentView: View {
                     HStack(alignment: .center) {
                         if coordinator.expandingView.show
                             && coordinator.expandingView.type == .music {
-                            MarqueeText(
-                                musicManager.songTitle,
+                            SmoothTrackText(
+                                text: musicManager.songTitle, font: .body,
                                 color: Defaults[.coloredSpectrogram]
                                     ? Color(nsColor: musicManager.avgColor) : Color.gray,
-                                delayDuration: 0.4,
-                                frameWidth: inlineMusicPeekLabelWidth
+                                width: inlineMusicPeekLabelWidth,
+                                height: NSFont.preferredFont(forTextStyle: .body).pointSize * 1.3,
+                                delayDuration: 0.4
                             )
                             .opacity(
                                 (coordinator.expandingView.show
@@ -737,9 +738,14 @@ struct ContentView: View {
                             )
                             Spacer(minLength: vm.closedNotchSize.width)
                             // Song Artist
-                            Text(musicManager.artistName)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
+                            ZStack(alignment: .trailing) {
+                                Text(musicManager.artistName)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                    .id(musicManager.artistName)
+                                    .transition(.opacity)
+                            }
+                                .animation(.easeInOut(duration: reduceMotion ? 0.15 : 0.5), value: musicManager.artistName)
                                 .frame(width: inlineMusicPeekLabelWidth, alignment: .trailing)
                                 .foregroundStyle(
                                     Defaults[.coloredSpectrogram]
@@ -1080,6 +1086,7 @@ struct GeneralDropTargetDelegate: DropDelegate {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     let vm = BoringViewModel(camera: CameraModel())
     vm.open()
@@ -1087,3 +1094,4 @@ struct GeneralDropTargetDelegate: DropDelegate {
         .environmentObject(vm)
         .frame(width: vm.notchSize.width, height: vm.notchSize.height)
 }
+#endif

@@ -195,6 +195,8 @@ final class CameraPreviewNSView: NSView {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     CameraPreviewView(camera: CameraModel())
 }
+#endif

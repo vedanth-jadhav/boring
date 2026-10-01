@@ -22,6 +22,7 @@ Carthage/Build/
 # Swift Package Manager
 .swiftpm/
 .build/
+.spm-generated/
 
 # Derived data
 DerivedData/
@@ -52,4 +53,3 @@ build/
 *.ipa
 *.xcarchive
 *.dSYM
-

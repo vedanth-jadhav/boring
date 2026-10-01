@@ -52,8 +52,13 @@ struct DynamicNotchApp: App {
         #endif
         let sparkleUpdaterDelegate = BoringSparkleUpdaterDelegate()
         self.sparkleUpdaterDelegate = sparkleUpdaterDelegate
+        #if BORING_LOCAL_BUILD
+        let startUpdater = false
+        #else
+        let startUpdater = true
+        #endif
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: true, updaterDelegate: sparkleUpdaterDelegate, userDriverDelegate: nil)
+            startingUpdater: startUpdater, updaterDelegate: sparkleUpdaterDelegate, userDriverDelegate: nil)
         SoftwareUpdateStore.updater = updaterController.updater
 
         // Initialize the settings window controller with the updater controller
@@ -68,7 +73,9 @@ struct DynamicNotchApp: App {
                 }
             }
             .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
+            #if !BORING_LOCAL_BUILD
             CheckForUpdatesView(updater: updaterController.updater)
+            #endif
             Button("Restart Boring Notch") {
                 ApplicationRelauncher.restart()
             }

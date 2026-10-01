@@ -67,9 +67,11 @@ struct OpenNotchOSD: View {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     OpenNotchOSD(type: .constant(.volume), value: .constant(0.5), icon: .constant(""), accent: .constant(nil))
         .environmentObject(BoringViewModel(camera: CameraModel()))
         .padding()
         .background(Color.gray)
 }
+#endif

@@ -151,7 +151,9 @@ extension View where Self: Shape {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     HelloAnimation(onFinish: {})
         .frame(width: 300, height: 100)
 }
+#endif

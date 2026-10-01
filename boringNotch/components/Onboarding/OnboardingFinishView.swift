@@ -55,6 +55,8 @@ struct OnboardingFinishView: View {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     OnboardingFinishView(onFinish: { }, onOpenSettings: { })
 }
+#endif

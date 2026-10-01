@@ -331,6 +331,7 @@ struct BoringBatteryView: View {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     BoringBatteryView(
         batteryWidth: 30,
@@ -345,3 +346,4 @@ struct BoringBatteryView: View {
         isForNotification: false
     ).frame(width: 200, height: 200)
 }
+#endif

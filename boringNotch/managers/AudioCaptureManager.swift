@@ -219,6 +219,10 @@ final class AudioCaptureManager: ObservableObject {
 
     private func resolvePIDs(displayBundleID: String, captureBundleIDs: [String]) -> [pid_t] {
         let displayApps = NSRunningApplication.runningApplications(withBundleIdentifier: displayBundleID)
+        if displayBundleID == MediaAppBundleID.brave,
+           let audioService = braveAudioServicePID(inside: displayApps.compactMap(displayBundlePath(for:))) {
+            return [audioService]
+        }
         let displayNames = Set(displayApps.compactMap(\.localizedName))
         let displayBundlePaths = Set(displayApps.compactMap(displayBundlePath(for:)))
 
@@ -249,6 +253,30 @@ final class AudioCaptureManager: ObservableObject {
         }
 
         return pids.sorted()
+    }
+
+    /// Chromium's audio utility is a background process, not a running GUI
+    /// application. NSRunningApplication often exposes a different helper
+    /// (video capture), which yields a silent process tap.
+    private func braveAudioServicePID(inside appPaths: [String]) -> pid_t? {
+        guard !appPaths.isEmpty else { return nil }
+        var pids = [pid_t](repeating: 0, count: 4096)
+        let count = Int(proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size)))
+        guard count > 0 else { return nil }
+        for pid in pids.prefix(count) where pid > 0 {
+            guard let path = executablePath(forPID: pid),
+                  appPaths.contains(where: { pathContainsApp($0, candidatePath: path) }),
+                  path.contains("Brave Browser Helper") else { continue }
+            var query: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
+            var length = 0
+            guard sysctl(&query, 3, nil, &length, nil, 0) == 0, length > 0, length < 16384 else { continue }
+            var arguments = [UInt8](repeating: 0, count: length)
+            guard sysctl(&query, 3, &arguments, &length, nil, 0) == 0 else { continue }
+            if String(decoding: arguments, as: UTF8.self).contains("--utility-sub-type=audio.mojom.AudioService") {
+                return pid
+            }
+        }
+        return nil
     }
 
     private func shouldInclude(

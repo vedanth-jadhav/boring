@@ -244,6 +244,7 @@ struct MusicVisualizer: NSViewRepresentable {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     ZStack {
         Color.black
@@ -252,3 +253,4 @@ struct MusicVisualizer: NSViewRepresentable {
     }
     .padding()
 }
+#endif

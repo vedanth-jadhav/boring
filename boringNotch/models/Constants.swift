@@ -201,6 +201,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
     case appleMusic
     case spotify
     case youtubeMusic
+    case octave
 
     var id: String { self.rawValue }
 
@@ -210,6 +211,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
         case "appleMusic", "Apple Music": self = .appleMusic
         case "spotify", "Spotify": self = .spotify
         case "youtubeMusic", "YouTube Music": self = .youtubeMusic
+        case "octave", "Octave": self = .octave
         default: return nil
         }
     }
@@ -237,6 +239,8 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
             "Spotify"
         case .youtubeMusic:
             "YouTube Music"
+        case .octave:
+            "Octave in Brave"
         }
     }
 
@@ -445,7 +449,12 @@ extension Defaults.Keys {
     static let sneakPeekStyles = Key<SneakPeekStyle>("sneakPeekStyles", default: .standard)
     static let waitInterval = Key<Double>("waitInterval", default: 3)
     static let showShuffleAndRepeat = Key<Bool>("showShuffleAndRepeat", default: false)
+    #if BORING_LOCAL_BUILD
+    static let enableLyrics = Key<Bool>("enableLyrics", default: true)
+    #else
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
+    #endif
+    static let romanizeLyrics = Key<Bool>("romanizeLyrics", default: true)
     static let showRemainingTime = Key<Bool>("showRemainingTime", default: false)
     static let musicControlSlots = Key<[MusicControlButton]>(
         "musicControlSlots",

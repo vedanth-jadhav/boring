@@ -30,6 +30,7 @@ struct MarqueeText: View {
     let delayDuration: Double
     let frameWidth: CGFloat
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var animate = false
     @State private var textSize: CGSize = .zero
     @State private var offset: CGFloat = 0
@@ -69,11 +70,11 @@ struct MarqueeText: View {
                 )
                 .modifier(MeasureSizeModifier())
                 .onPreferenceChange(SizePreferenceKey.self) { size in
-                    self.textSize = CGSize(width: size.width / 2, height: NSFont.preferredFont(forTextStyle: nsFont).pointSize)
+                    self.textSize = CGSize(width: size.width / 2, height: size.height)
                     self.animate = false
                     self.offset = 0
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
-                        if needsScrolling {
+                        if needsScrolling && !reduceMotion {
                             self.animate = true
                             self.offset = -(textSize.width + 10)
                         }
@@ -107,6 +108,7 @@ struct TimedLyricText: View {
         static let startDelayShare: Double = 0.28
     }
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var textSize: CGSize = .zero
     @State private var offset: CGFloat = 0
     @State private var animationToken = UUID()
@@ -180,12 +182,12 @@ struct TimedLyricText: View {
                 .offset(x: offset)
                 .modifier(MeasureSizeModifier())
                 .onPreferenceChange(SizePreferenceKey.self) { size in
-                    textSize = CGSize(width: size.width, height: NSFont.preferredFont(forTextStyle: nsFont).pointSize)
+                    textSize = CGSize(width: size.width, height: size.height)
                     restartAnimationIfNeeded()
                 }
-                .onChange(of: text) { _ in restartAnimationIfNeeded() }
-                .onChange(of: frameWidth) { _ in restartAnimationIfNeeded() }
-                .onChange(of: animationID) { _ in restartAnimationIfNeeded() }
+                .onChange(of: text) { restartAnimationIfNeeded() }
+                .onChange(of: frameWidth) { restartAnimationIfNeeded() }
+                .onChange(of: animationID) { restartAnimationIfNeeded() }
         }
         .frame(width: frameWidth, alignment: .leading)
         .clipped()
@@ -203,7 +205,7 @@ struct TimedLyricText: View {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
-            guard animationToken == token, needsScrolling else { return }
+            guard animationToken == token, needsScrolling, !reduceMotion else { return }
             let timing = animationTiming
             withAnimation(.linear(duration: timing.duration).delay(timing.delay)) {
                 offset = finalOffset

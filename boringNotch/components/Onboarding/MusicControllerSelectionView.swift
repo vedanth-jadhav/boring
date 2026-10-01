@@ -174,11 +174,18 @@ extension MediaControllerType {
                 "Requires a third-party client with API plugin enabled.",
                 comment: "Onboarding description of the YouTube Music source."
             )
+        case .octave:
+            LocalizedStringResource(
+                "Controls Octave in Brave through the local browser extension.",
+                comment: "Onboarding description of the Octave source."
+            )
         }
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     MusicControllerSelectionView(onContinue: {})
         .frame(width: 400, height: 600)
 }
+#endif

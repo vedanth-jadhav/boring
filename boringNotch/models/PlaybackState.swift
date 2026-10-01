@@ -24,6 +24,7 @@ struct PlaybackState {
     var duration: Double = 0
     var playbackRate: Double = 1
     var isShuffled: Bool = false
+    var isSmartShuffled: Bool = false
     var repeatMode: RepeatMode = .off
     var lastUpdated: Date = Date.distantPast
     var artwork: Data?
@@ -58,6 +59,7 @@ extension PlaybackState: Equatable {
             && lhs.currentTime == rhs.currentTime
             && lhs.duration == rhs.duration
             && lhs.isShuffled == rhs.isShuffled
+            && lhs.isSmartShuffled == rhs.isSmartShuffled
             && lhs.repeatMode == rhs.repeatMode
             && lhs.artwork == rhs.artwork
             && lhs.isFavorite == rhs.isFavorite

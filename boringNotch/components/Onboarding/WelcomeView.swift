@@ -76,6 +76,8 @@ struct WelcomeView: View {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     WelcomeView()
 }
+#endif

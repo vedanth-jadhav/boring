@@ -69,7 +69,9 @@ struct AboutView: View {
                     Text("Version info")
                 }
 
+                #if !BORING_LOCAL_BUILD
                 UpdaterSettingsView(updater: updaterController.updater)
+                #endif
 
                 HStack(spacing: 30) {
                     Spacer(minLength: 0)
@@ -117,7 +119,9 @@ struct AboutView: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .toolbar {
+            #if !BORING_LOCAL_BUILD
             CheckForUpdatesView(updater: updaterController.updater)
+            #endif
         }
         .navigationTitle("About")
     }

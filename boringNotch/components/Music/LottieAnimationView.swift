@@ -19,6 +19,8 @@ struct LottieAnimationContainer: View {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     LottieAnimationContainer()
 }
+#endif

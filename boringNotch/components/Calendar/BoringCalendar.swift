@@ -832,9 +832,11 @@ struct ReminderToggle: View {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     CalendarView()
         .frame(width: 215, height: 130)
         .background(.black)
         .environmentObject(BoringViewModel(camera: CameraModel()))
 }
+#endif

@@ -171,7 +171,9 @@ struct OSDSettings: View {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     OSDSettings()
         .frame(width: 500, height: 600)
 }
+#endif

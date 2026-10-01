@@ -5,6 +5,7 @@
 //  Created by Richard Kunkli on 07/08/2024.
 //
 
+import AppKit
 import Defaults
 import SwiftUI
 
@@ -103,6 +104,15 @@ struct MediaSettingsView: View {
                         customBadge(text: "Beta")
                     }
                 }
+                Defaults.Toggle(key: .romanizeLyrics) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Romanise Hindi, Punjabi and Urdu lyrics")
+                        Text("Keep the original words in Latin letters, such as दिल → dil. Urdu spelling may be approximate.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(!enableLyrics)
                 Defaults.Toggle(key: .showRemainingTime) {
                     Text("Show remaining time instead of duration")
                 }
@@ -153,6 +163,20 @@ struct MediaSettingsView: View {
         .task {
             musicManager.ensureNowPlayingAvailabilityChecked()
         }
+        .onChange(of: enableLyrics) { _, enabled in
+            if enabled {
+                Task {
+                    await LyricsService.shared.fetchLyrics(
+                        bundleIdentifier: musicManager.bundleIdentifier,
+                        title: musicManager.songTitle,
+                        artist: musicManager.artistName,
+                        preferProvider: musicManager.effectiveMediaController == .octave
+                    )
+                }
+            } else {
+                LyricsService.shared.clearLyrics()
+            }
+        }
     }
 
     private var mediaControllerSelection: Binding<MediaControllerType> {
@@ -169,7 +193,19 @@ struct MediaSettingsView: View {
     private var mediaSourceFooter: some View {
         let availability = musicManager.nowPlayingAvailability
 
-        if availability == .checking {
+        if musicManager.preferredMediaController == .octave {
+            VStack(alignment: .leading, spacing: 6) {
+                footerText("Load the bundled Octave bridge as an unpacked extension in Brave, then reload the Octave tab. The extension only runs on music.octavestreaming.com.")
+                Button("Show Brave extension folder") {
+                    if let url = Bundle.main.resourceURL?.appendingPathComponent("octave-brave-extension", isDirectory: true) {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                .font(.caption)
+            }
+        } else if musicManager.preferredMediaController != .nowPlaying {
+            EmptyView()
+        } else if availability == .checking {
             footerText("Checking Now Playing availability...")
         } else if let message = availability.settingsMessage {
             VStack(alignment: .leading, spacing: 6) {

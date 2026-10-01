@@ -23,8 +23,10 @@ struct TabButton: View {
     }
 }
 
+#if !BORING_LOCAL_BUILD
 #Preview {
     TabButton(label: "Home", icon: "tray.fill", selected: true) {
         Log.general.debug("Tapped")
     }
 }
+#endif
