@@ -12,6 +12,11 @@ import SwiftUI
 // MARK: - Standardized Animations
 /// Centralized animation definitions for consistent UI behavior across the app.
 enum StandardAnimations {
+    /// Controls clear before the surface contracts; artwork has its own layer.
+    static var contentDismiss: Animation {
+        guard Defaults[.enableOpeningAnimation] else { return .linear(duration: 0) }
+        return .easeOut(duration: 0.10 / Defaults[.animationSpeedMultiplier])
+    }
     /// Content arrives after the expanding surface starts making space.
     static var contentSettle: Animation {
         guard Defaults[.enableOpeningAnimation] else { return .linear(duration: 0) }
@@ -20,6 +25,9 @@ enum StandardAnimations {
     }
     /// Interactive spring for responsive UI (used for notch interactions)
     static let interactive = Animation.interactiveSpring(response: 0.38, dampingFraction: 0.8, blendDuration: 0)
+
+    /// Tab/session changes settle quickly without disturbing the top anchor.
+    static let focusTab = Animation.interactiveSpring(response: 0.36, dampingFraction: 0.94, blendDuration: 0)
 
     /// Spring animation for opening the notch
     static var open: Animation {

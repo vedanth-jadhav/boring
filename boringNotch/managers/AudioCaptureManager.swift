@@ -28,7 +28,7 @@ final class AudioCaptureManager: ObservableObject {
     private static let log2n: vDSP_Length = 10
     private static let ringCapacity = 4096
     private static let fftIntervalMilliseconds = 33
-    private static let fftLeewayMilliseconds = 0
+    private static let fftLeewayMilliseconds = 10
     private static let floorDB: Float = -58
     private static let ceilDB: Float = -14
     private static let referenceHz: Double = 1000
@@ -43,6 +43,9 @@ final class AudioCaptureManager: ObservableObject {
     @Published private(set) var isCapturing: Bool = false
 
     private var cancellables = Set<AnyCancellable>()
+    // Modified on the main actor; one visible consumer is enough for all bars.
+    private var suspensionReasons = Set<String>()
+    private var lifecycleObservers: [(NotificationCenter, NSObjectProtocol)] = []
 
     private var tapObjectID: AudioObjectID = kAudioObjectUnknown
     private var aggregateDeviceID: AudioDeviceID = 0
@@ -73,9 +76,9 @@ final class AudioCaptureManager: ObservableObject {
     private var bandRanges: [Range<Int>] = []
     private var pinkCompensationDB: [Float] = []
 
-    private let fftQueue = DispatchQueue(label: "com.boringnotch.audiocapture.fft", qos: .userInitiated)
-    private let ioQueue = DispatchQueue(label: "com.boringnotch.audiocapture.io", qos: .userInteractive)
-    private let lifecycleQueue = DispatchQueue(label: "com.boringnotch.audiocapture.lifecycle", qos: .userInitiated)
+    private let fftQueue = DispatchQueue(label: "com.boringnotch.audiocapture.fft", qos: .utility)
+    private let ioQueue = DispatchQueue(label: "com.boringnotch.audiocapture.io", qos: .userInitiated)
+    private let lifecycleQueue = DispatchQueue(label: "com.boringnotch.audiocapture.lifecycle", qos: .utility)
     private var fftTimer: DispatchSourceTimer?
 
     private init() {
@@ -116,6 +119,7 @@ final class AudioCaptureManager: ObservableObject {
         syncOnLifecycleQueue {
             stopCaptureOnLifecycleQueue()
         }
+        for (center, token) in lifecycleObservers { center.removeObserver(token) }
         ringBuffer.deinitialize(count: Self.ringCapacity)
         ringBuffer.deallocate()
     }
@@ -124,12 +128,14 @@ final class AudioCaptureManager: ObservableObject {
         levelsConsumerLock.lock()
         defer { levelsConsumerLock.unlock() }
         levelsConsumers.add(consumer)
+        Task { @MainActor [weak self] in self?.reevaluateCapture() }
     }
 
     func clearLevelsConsumer(_ consumer: AudioCaptureLevelsConsumer) {
         levelsConsumerLock.lock()
         defer { levelsConsumerLock.unlock() }
         levelsConsumers.remove(consumer)
+        Task { @MainActor [weak self] in self?.reevaluateCapture() }
     }
 
     func latestLevelsSnapshot() -> [Float]? {
@@ -157,6 +163,7 @@ final class AudioCaptureManager: ObservableObject {
 
     @MainActor
     private func observeState() {
+        observeSuspension()
         // MusicManager is @MainActor — wire the publishers on the main
         // actor; delivery then continues via receive(on:) as before.
         Task { @MainActor in
@@ -185,13 +192,53 @@ final class AudioCaptureManager: ObservableObject {
         }
     }
 
+    @MainActor
+    private func reevaluateCapture() {
+        let music = MusicManager.shared
+        evaluate(isPlaying: music.isPlaying, displayBundleID: music.bundleIdentifier,
+                 captureBundleIDs: music.audioCaptureBundleIdentifiers, enabled: Defaults[.realtimeAudioWaveform])
+    }
+
+    @MainActor
+    private func observeSuspension() {
+        let workspace = NSWorkspace.shared.notificationCenter
+        for (sleep, wake, reason) in [
+            (NSWorkspace.willSleepNotification, NSWorkspace.didWakeNotification, "system"),
+            (NSWorkspace.screensDidSleepNotification, NSWorkspace.screensDidWakeNotification, "display")
+        ] {
+            observe(workspace, name: sleep, reason: reason, suspended: true)
+            observe(workspace, name: wake, reason: reason, suspended: false)
+        }
+        let distributed = DistributedNotificationCenter.default()
+        observe(distributed, name: .init("com.apple.screenIsLocked"), reason: "lock", suspended: true)
+        observe(distributed, name: .init("com.apple.screenIsUnlocked"), reason: "lock", suspended: false)
+    }
+
+    @MainActor
+    private func observe(_ center: NotificationCenter, name: Notification.Name, reason: String, suspended: Bool) {
+        let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if suspended { self.suspensionReasons.insert(reason) }
+                else { self.suspensionReasons.remove(reason) }
+                self.reevaluateCapture()
+            }
+        }
+        lifecycleObservers.append((center, token))
+    }
+
+    @MainActor
     private func evaluate(
         isPlaying: Bool,
         displayBundleID: String?,
         captureBundleIDs: [String],
         enabled: Bool
     ) {
+        levelsConsumerLock.lock()
+        let hasVisibleConsumers = levelsConsumers.count > 0
+        levelsConsumerLock.unlock()
         guard #available(macOS 14.2, *),
+              hasVisibleConsumers, suspensionReasons.isEmpty,
               enabled, isPlaying,
               let resolvedDisplayBundleID = displayBundleID,
               !resolvedDisplayBundleID.isEmpty else {

@@ -5,7 +5,9 @@
   window.__boringNotchOctaveBridge = true;
   const handlers = new Map();
   let deck = null;
+  let buffering = false;
   let lastSnapshot = "";
+  let lastPublishedAt = -Infinity;
   let latestSeek = 0;
   let playerStore = null;
   let unsubscribePlayer = null;
@@ -84,9 +86,10 @@
     const engine = window.__octaveEngine;
     const audio = engine?.active;
     if (audio !== deck) {
-      if (deck) for (const name of events) deck.removeEventListener(name, publish);
+      if (deck) for (const name of events) deck.removeEventListener(name, handleMediaEvent);
       deck = audio || null;
-      if (deck) for (const name of events) deck.addEventListener(name, publish);
+      buffering = !!audio && !audio.paused && audio.readyState < 3;
+      if (deck) for (const name of events) deck.addEventListener(name, handleMediaEvent);
     }
     const metadata = media.metadata;
     if (!audio || !metadata?.title) return;
@@ -94,20 +97,32 @@
     requestLyrics(player?.currentTrack);
     const artwork = metadata.artwork?.at(-1)?.src || "";
     const sampledAt = performance.timeOrigin + performance.now();
-    const state = {type: "state", sampledAt, title: metadata.title, artist: metadata.artist || "",
+    const state = {type: "state", sampledAt, clockDiscontinuity: force === true, title: metadata.title, artist: metadata.artist || "",
       album: metadata.album || "", artwork, position: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
       duration: Number.isFinite(audio.duration) ? audio.duration : 0,
-      playing: !audio.paused && !audio.ended, rate: audio.playbackRate || 1,
+      playing: !audio.paused && !audio.ended, rate: buffering ? 0 : (Number.isFinite(audio.playbackRate) ? Math.max(0, audio.playbackRate) : 1),
       shuffle: !!player?.shuffle, smartShuffle: !!player?.smartShuffle,
       volume: Number.isFinite(audio.volume) ? audio.volume : 1,
       source: "boring-notch-octave"};
-    const fingerprint = JSON.stringify(state);
-    if (force || fingerprint !== lastSnapshot) {
+    // The clock advances locally. Transport metadata changes immediately;
+    // position anchors are sent on discontinuities and a slow heartbeat.
+    const {sampledAt: _sampledAt, position: _position, clockDiscontinuity: _clockDiscontinuity, ...metadataState} = state;
+    const fingerprint = JSON.stringify(metadataState);
+    if (force === true || fingerprint !== lastSnapshot || sampledAt - lastPublishedAt >= 5000) {
       lastSnapshot = fingerprint;
+      lastPublishedAt = sampledAt;
       window.postMessage(state, location.origin);
     }
   }
-  const events = ["play", "pause", "playing", "timeupdate", "seeked", "seeking", "loadedmetadata", "durationchange", "volumechange", "ended", "emptied"];
+  const events = ["play", "pause", "playing", "waiting", "canplay", "timeupdate", "seeked", "seeking", "loadedmetadata", "durationchange", "volumechange", "ratechange", "ended", "emptied"];
+  function handleMediaEvent(event) {
+    if (event.type === "waiting") buffering = true;
+    else if (event.type === "playing" || event.type === "canplay") buffering = false;
+    publish(event.type !== "timeupdate");
+  }
+  // Media events can stop in background tabs. Refresh anchors when delivery
+  // resumes; a paused page needs no periodic native messages.
+  setInterval(() => { if (deck && !deck.paused && !deck.ended) publish(); }, 5000);
   const descriptor = Object.getOwnPropertyDescriptor(MediaSession.prototype, "metadata");
   if (descriptor?.set) {
     Object.defineProperty(media, "metadata", {

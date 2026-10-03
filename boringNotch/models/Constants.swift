@@ -423,6 +423,7 @@ extension Defaults.Keys {
     static let mirrorCameraID = Key<String?>("mirrorCameraID", default: nil)
     static let settingsIconInNotch = Key<Bool>("settingsIconInNotch", default: true)
     static let lightingEffect = Key<Bool>("lightingEffect", default: true)
+    static let reduceGlass = Key<Bool>("reduceGlass", default: false)
     static let enableShadow = Key<Bool>("enableShadow", default: true)
     static let cornerRadiusScaling = Key<Bool>("cornerRadiusScaling", default: true)
 
@@ -492,6 +493,9 @@ extension Defaults.Keys {
     /// Off by default: mirroring banners needs Accessibility access.
     static let notificationLiveActivity = Key<Bool>("notificationLiveActivity", default: false)
     static let notificationsFromAllApps = Key<Bool>("notificationsFromAllApps", default: false)
+    static let notificationBlockedApps = Key<Set<String>>("notificationBlockedApps", default: [])
+    static let notificationPreviewPrivacy = Key<Bool>("notificationPreviewPrivacy", default: false)
+    static let notificationSuppressNativeBanners = Key<Bool>("notificationSuppressNativeBanners", default: true)
     static let notificationAllowedApps = Key<Set<String>>(
         "notificationAllowedApps",
         default: []

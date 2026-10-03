@@ -149,6 +149,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             screenUnlockedObserver = nil
         }
         MainActor.assumeIsolated {
+            FocusSessionManager.shared.shutdown()
+            CaffeineManager.shared.releaseAll()
             MusicManager.shared.destroy()
             windowManager.cleanup()
         }
@@ -172,6 +174,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        if CommandLine.arguments.contains("--notification-diagnostics") {
+            Task { await NotificationDiagnostics.run() }
+            return
+        }
+        #endif
+        Task { await LegacyNotificationSessionCleanup.run() }
+        _ = FocusSessionManager.shared
         do {
             if let migratedURL = try LegacyAppBundleMigration.migrateIfNeeded(at: Bundle.main.bundleURL) {
                 isMigratingLegacyBundle = true

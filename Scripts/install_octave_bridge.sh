@@ -2,20 +2,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 app="/Applications/Boring Notch Octave.app"
-source_app="$PWD/build/Boring Notch Octave.app"
-if [[ ! -d "$source_app" ]]; then echo "Package the app first." >&2; exit 1; fi
-mkdir -p "/Applications" \
+if [[ ! -d "$PWD/build/Boring Notch Octave.app" ]]; then echo "Package the app first." >&2; exit 1; fi
+bash Scripts/install_local.sh --skip-build
+mkdir -p \
   "$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts" \
   "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
-staging=$(mktemp -d "/Applications/.boring-octave.XXXXXX")
-trap 'rm -rf "$staging"' EXIT
-ditto "$source_app" "$staging/Boring Notch Octave.app"
-codesign --verify --deep --strict "$staging/Boring Notch Octave.app"
-# A merge copy leaves old bundle signatures in Resources after a rebuild.
-# Replace the complete local app so every installed file matches the seal.
-rm -rf "$app"
-mv "$staging/Boring Notch Octave.app" "$app"
-codesign --verify --deep --strict "$app"
 manifest="$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts/com.boringnotch.local.octave.json"
 python3 - "$manifest" "$app/Contents/Resources/octave-native-host.py" <<'PY'
 import json,pathlib,sys

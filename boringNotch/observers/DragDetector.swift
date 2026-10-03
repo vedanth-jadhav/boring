@@ -23,6 +23,7 @@ final class DragDetector {
     private var mouseUpMonitor: Any?
 
     private var pasteboardChangeCount: Int = -1
+    private var lastPasteboardProbe = Date.distantPast
     private var isDragging: Bool = false
     private var isContentDragging: Bool = false
     private var hasEnteredNotchRegion: Bool = false
@@ -58,6 +59,7 @@ final class DragDetector {
         mouseDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
             guard let self = self else { return }
             self.pasteboardChangeCount = self.dragPasteboard.changeCount
+            self.lastPasteboardProbe = .distantPast
             self.isDragging = true
             self.isContentDragging = false
             self.hasEnteredNotchRegion = false
@@ -68,11 +70,16 @@ final class DragDetector {
             guard let self = self else { return }
             guard self.isDragging else { return }
 
-            let newContent = self.dragPasteboard.changeCount != self.pasteboardChangeCount
-
-            // Detect if actual content is being dragged AND it's valid content
-            if newContent && !self.isContentDragging && self.hasValidDragContent() {
-                self.isContentDragging = true
+            // A drag session may begin after several mouse-move events (the
+            // source app's drag threshold). Retry slowly until the pasteboard
+            // changes, then latch it; never miss a late-starting file drag.
+            if !self.isContentDragging, Date().timeIntervalSince(self.lastPasteboardProbe) >= 0.15 {
+                self.lastPasteboardProbe = Date()
+                let count = self.dragPasteboard.changeCount
+                if count != self.pasteboardChangeCount {
+                    self.pasteboardChangeCount = count
+                    self.isContentDragging = self.hasValidDragContent()
+                }
             }
 
             // Only process position when content is being dragged

@@ -11,16 +11,9 @@ import AppKit
 enum ApplicationRelauncher {
     static func restart(at appURL: URL? = nil) {
         let workspace = NSWorkspace.shared
-        let applicationURL: URL
-
-        if let appURL {
-            applicationURL = appURL
-        } else {
-            guard let bundleIdentifier = Bundle.main.bundleIdentifier,
-                  let registeredURL = workspace.urlForApplication(withBundleIdentifier: bundleIdentifier)
-            else { return }
-            applicationURL = registeredURL
-        }
+        // Launch Services can resolve the same identifier to a stale copy in
+        // ~/Applications or a build directory. Restart the actual running app.
+        let applicationURL = appURL ?? Bundle.main.bundleURL
 
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.createsNewApplicationInstance = true

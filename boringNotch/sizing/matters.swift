@@ -11,12 +11,14 @@ import SwiftUI
 
 let shadowPadding: CGFloat = 20
 let openNotchSize: CGSize = .init(width: 640, height: 190)
-let windowSize: CGSize = .init(width: openNotchSize.width, height: openNotchSize.height + shadowPadding)
-let cornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 19, bottom: 24), closed: (top: 6, bottom: 14))
+// Reserve satellite space while keeping the physical notch centered. The
+// transparent canvas never owns hover; only the notch and pill do.
+let windowSize: CGSize = .init(width: openNotchSize.width + 2 * (90 + 8), height: max(openNotchSize.height, 330) + shadowPadding)
+let cornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 19, bottom: 32), closed: (top: 6, bottom: 14))
 
 /// Compact mode uses a much rounder opened shape than the standard layout
 /// — matching Atoll's minimalisticCornerRadiusInsets (35/35 against the
-/// standard 19/24). At compact's smaller size the standard radius reads
+/// standard 19/32). At compact's smaller size the standard radius reads
 /// square; the rounder corners are what make it look like a pill rather
 /// than a shrunken panel.
 let compactCornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 35, bottom: 35), closed: cornerRadiusInsets.closed)

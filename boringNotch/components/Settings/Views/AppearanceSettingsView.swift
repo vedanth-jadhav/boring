@@ -19,6 +19,13 @@ struct AppearanceSettingsView: View {
         Form {
             accentColorSection
             notchChromeSection
+            Section {
+                Defaults.Toggle(key: .reduceGlass) {
+                    Text("Reduce glass")
+                    Text("Use a solid background to reduce graphics work.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
             idleSection
         }
         .accentColor(.effectiveAccent)

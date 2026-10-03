@@ -9,14 +9,17 @@ final class LyricTextLayout {
     let totalWidth: CGFloat
     let spacing: CGFloat
     let pages: [Range<Int>]
+    let pageForWord: [Range<Int>]
+    let accessibilityText: String
     private static let cache: NSCache<NSString, LyricTextLayout> = {
         let cache = NSCache<NSString, LyricTextLayout>()
         cache.countLimit = 240
         return cache
     }()
 
-    static func cached(words: [LyricLine.Word], romanize: Bool, pointSize: CGFloat, width: CGFloat) -> LyricTextLayout {
-        let key = "\(romanize)|\(pointSize)|\(width)|" + words.map(\.text).joined(separator: "\u{001F}")
+    static func cached(words: [LyricLine.Word], rowID: String? = nil, romanize: Bool, pointSize: CGFloat, width: CGFloat) -> LyricTextLayout {
+        let identity = rowID ?? words.map(\.text).joined(separator: "\u{001F}")
+        let key = "\(romanize)|\(pointSize)|\(width)|\(identity)"
         if let layout = cache.object(forKey: key as NSString) { return layout }
         let layout = LyricTextLayout(words: words, romanize: romanize, pointSize: pointSize, width: width)
         cache.setObject(layout, forKey: key as NSString)
@@ -45,5 +48,7 @@ final class LyricTextLayout {
         }
         if start < widths.count { ranges.append(start..<widths.count) }
         pages = ranges
+        pageForWord = ranges.flatMap { range in Array(repeating: range, count: range.count) }
+        accessibilityText = text.joined(separator: " ")
     }
 }

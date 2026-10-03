@@ -17,6 +17,8 @@ class MusicVisualizerModel: NSView, AudioCaptureLevelsConsumer {
     private var lastTintColor: NSColor?
 
     private weak var attachedManager: AudioCaptureManager?
+    private var visibilityObserver: NSObjectProtocol?
+    private var visibleConsumer = false
     private var lastAppliedLevels: [Float]
     private static let levelChangeThreshold: Float = 0.005
     private static let minBarScale: CGFloat = 0.12
@@ -44,6 +46,41 @@ class MusicVisualizerModel: NSView, AudioCaptureLevelsConsumer {
 
     deinit {
         attachedManager?.clearLevelsConsumer(self)
+        if let visibilityObserver { NotificationCenter.default.removeObserver(visibilityObserver) }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let visibilityObserver { NotificationCenter.default.removeObserver(visibilityObserver) }
+        visibilityObserver = nil
+        if let window {
+            visibilityObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
+            ) { [weak self] _ in self?.updateVisibility() }
+        }
+        updateVisibility()
+    }
+
+    override func viewDidHide() { super.viewDidHide(); updateVisibility() }
+    override func viewDidUnhide() { super.viewDidUnhide(); updateVisibility() }
+
+    private func updateVisibility() {
+        let visible = window?.occlusionState.contains(.visible) == true && !isHiddenOrHasHiddenAncestor
+        guard visibleConsumer != visible else { return }
+        visibleConsumer = visible
+        if visible {
+            attachedManager?.setLevelsConsumer(self)
+            if isPlaying && !useRealtime { startRandomAnimating() }
+        } else {
+            attachedManager?.clearLevelsConsumer(self)
+            stopRandomAnimating()
+        }
+    }
+
+    func detach() {
+        attachedManager?.clearLevelsConsumer(self)
+        attachedManager = nil
+        stopRandomAnimating()
     }
 
     private func setupBars() {
@@ -101,7 +138,7 @@ class MusicVisualizerModel: NSView, AudioCaptureLevelsConsumer {
     }
 
     private func animateBar(_ barLayer: CAGradientLayer, delay: Double = 0) {
-        guard isPlaying else { return }
+        guard isPlaying, visibleConsumer else { return }
         let animation = CAKeyframeAnimation(keyPath: "transform.scale.y")
         var values: [CGFloat] = []
         var keyTimes: [NSNumber] = []
@@ -173,7 +210,7 @@ class MusicVisualizerModel: NSView, AudioCaptureLevelsConsumer {
         guard attachedManager !== manager else { return }
         attachedManager?.clearLevelsConsumer(self)
         attachedManager = manager
-        manager.setLevelsConsumer(self)
+        if visibleConsumer { manager.setLevelsConsumer(self) }
     }
 
     func syncCurrentLevels(from manager: AudioCaptureManager) {
@@ -187,7 +224,7 @@ class MusicVisualizerModel: NSView, AudioCaptureLevelsConsumer {
     }
 
     private func applyLevels(_ values: [Float]) {
-        guard isPlaying, useRealtime, values.count == barCount else { return }
+        guard visibleConsumer, isPlaying, useRealtime, values.count == barCount else { return }
         var maxDelta: Float = 0
         for i in 0..<barCount {
             let d = abs(values[i] - lastAppliedLevels[i])
@@ -225,6 +262,10 @@ struct MusicVisualizer: NSViewRepresentable {
     let tintColor: Color
     @Default(.realtimeAudioWaveform) var realtimeEnabled: Bool
     @ObservedObject private var audioCapture = AudioCaptureManager.shared
+
+    static func dismantleNSView(_ nsView: MusicVisualizerModel, coordinator: ()) {
+        nsView.detach()
+    }
 
     func makeNSView(context: Context) -> MusicVisualizerModel {
         let spectrum = MusicVisualizerModel()

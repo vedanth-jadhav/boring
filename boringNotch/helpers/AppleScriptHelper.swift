@@ -9,9 +9,9 @@ import Foundation
 
 final class AppleScriptHelper {
     @discardableResult
-    class func execute(_ scriptText: String) async throws -> NSAppleEventDescriptor? {
+    class func execute(_ scriptText: String, priority: TaskPriority = .utility) async throws -> NSAppleEventDescriptor? {
         try await withCheckedThrowingContinuation { continuation in
-            Task.detached(priority: .userInitiated) {
+            Task.detached(priority: priority) {
                 let script = NSAppleScript(source: scriptText)
                 var error: NSDictionary?
                 if let descriptor = script?.executeAndReturnError(&error) {
@@ -26,6 +26,7 @@ final class AppleScriptHelper {
     }
 
     class func executeVoid(_ scriptText: String) async throws {
-        _ = try await execute(scriptText)
+        // Transport commands originate from clicks and retain prompt delivery.
+        _ = try await execute(scriptText, priority: .userInitiated)
     }
 }

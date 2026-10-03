@@ -30,6 +30,9 @@ final class AppleMusicController: MediaControllerProtocol {
     }
 
     private var notificationTask: Task<Void, Never>?
+    private var artworkTrackID: String?
+    private var updateInFlight = false
+    private var updateRequested = false
 
     // MARK: - Initialization
     init() {
@@ -126,8 +129,19 @@ final class AppleMusicController: MediaControllerProtocol {
     }
 
     func updatePlaybackInfo() async {
+        // Apple Events are asynchronous. Coalesce overlapping hover/transport
+        // requests so an older response cannot overwrite a newer track.
+        guard !updateInFlight else { updateRequested = true; return }
+        updateInFlight = true
+        defer {
+            updateInFlight = false
+            if updateRequested {
+                updateRequested = false
+                Task { [weak self] in await self?.updatePlaybackInfo() }
+            }
+        }
         guard let descriptor = try? await fetchPlaybackInfoAsync() else { return }
-        guard descriptor.numberOfItems >= 11 else { return }
+        guard descriptor.numberOfItems >= 13 else { return }
         var updatedState = self.playbackState
 
         updatedState.isPlaying = descriptor.atIndex(1)?.booleanValue ?? false
@@ -141,7 +155,11 @@ final class AppleMusicController: MediaControllerProtocol {
         updatedState.repeatMode = RepeatMode(rawValue: Int(repeatModeValue)) ?? .off
         let volumePercentage = descriptor.atIndex(9)?.int32Value ?? 50
         updatedState.volume = Double(volumePercentage) / 100.0
-        updatedState.artwork = descriptor.atIndex(10)?.data as Data?
+        let trackID = descriptor.atIndex(12)?.stringValue ?? ""
+        if descriptor.atIndex(13)?.booleanValue == true {
+            updatedState.artwork = descriptor.atIndex(10)?.data as Data?
+            artworkTrackID = updatedState.artwork == nil ? nil : trackID
+        }
         let lovedState = descriptor.atIndex(11)?.booleanValue ?? false
         updatedState.isFavorite = lovedState
         updatedState.lastUpdated = Date()
@@ -155,6 +173,8 @@ final class AppleMusicController: MediaControllerProtocol {
     }
 
     private func fetchPlaybackInfoAsync() async throws -> NSAppleEventDescriptor? {
+        let cachedID = (artworkTrackID ?? "").replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
         let script = """
         tell application "Music"
             set isRunning to true
@@ -176,16 +196,25 @@ final class AppleMusicController: MediaControllerProtocol {
                 end if
 
                 try
-                    set artData to data of artwork 1 of current track
+                    set trackID to persistent ID of current track
+                    if trackID is missing value or trackID is "" then error number -1728
+                    set trackID to trackID as text
                 on error
-                    set artData to ""
+                    set trackID to currentTrackName & "|" & currentTrackArtist & "|" & currentTrackAlbum
                 end try
+                set fetchedArtwork to trackID is not "\(cachedID)"
+                set artData to ""
+                if fetchedArtwork then
+                    try
+                        set artData to data of artwork 1 of current track
+                    end try
+                end if
 
                 set currentVolume to sound volume
                 set favoriteState to favorited of current track
-                return {playerState, currentTrackName, currentTrackArtist, currentTrackAlbum, trackPosition, trackDuration, shuffleState, repeatValue, currentVolume, artData, favoriteState}
+                return {playerState, currentTrackName, currentTrackArtist, currentTrackAlbum, trackPosition, trackDuration, shuffleState, repeatValue, currentVolume, artData, favoriteState, trackID, fetchedArtwork}
             on error
-                return {false, "Not Playing", "Unknown", "Unknown", 0, 0, false, 0, 50, "", false}
+                return {false, "Not Playing", "Unknown", "Unknown", 0, 0, false, 0, 50, "", false, "", true}
             end try
         end tell
         """

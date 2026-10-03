@@ -31,7 +31,6 @@ struct MarqueeText: View {
     let frameWidth: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ViewState private var animate = false
     @ViewState private var textSize: CGSize = .zero
     @ViewState private var offset: CGFloat = 0
 
@@ -48,43 +47,55 @@ struct MarqueeText: View {
         textSize.width > frameWidth
     }
 
+    private struct AnimationKey: Hashable {
+        let text: String
+        let width: CGFloat
+        let measuredWidth: CGFloat
+        let reduceMotion: Bool
+    }
+
     var body: some View {
         GeometryReader { _ in
-            ZStack(alignment: .leading) {
-                HStack(spacing: 20) {
-                    Text(text)
-                    Text(text)
-                        .opacity(needsScrolling ? 1 : 0)
-                }
-                .id(text)
-                .font(font)
-                .foregroundColor(color)
-                .fixedSize(horizontal: true, vertical: false)
-                .offset(x: self.animate ? offset : 0)
-                .animation(
-                    self.animate ?
-                        .linear(duration: Double(textSize.width / 30))
-                        .delay(delayDuration)
-                        .repeatForever(autoreverses: false) : .none,
-                    value: self.animate
-                )
-                .modifier(MeasureSizeModifier())
-                .onPreferenceChange(SizePreferenceKey.self) { size in
-                    self.textSize = CGSize(width: size.width / 2, height: size.height)
-                    self.animate = false
-                    self.offset = 0
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
-                        if needsScrolling && !reduceMotion {
-                            self.animate = true
-                            self.offset = -(textSize.width + 10)
-                        }
-                    }
-                }
+            HStack(spacing: 20) {
+                Text(text)
+                    .modifier(MeasureSizeModifier())
+                if needsScrolling { Text(text) }
+            }
+            .font(font)
+            .foregroundStyle(color)
+            .fixedSize(horizontal: true, vertical: false)
+            // Cache the glyphs as one surface; only its transform moves.
+            .drawingGroup()
+            .offset(x: offset)
+            .onPreferenceChange(SizePreferenceKey.self) { size in
+                if textSize != size { textSize = size }
             }
             .frame(width: frameWidth, alignment: .leading)
             .clipped()
         }
         .frame(height: textSize.height * 1.3)
+        .task(id: AnimationKey(text: text, width: frameWidth, measuredWidth: textSize.width, reduceMotion: reduceMotion)) {
+            resetOffset()
+            guard needsScrolling, !reduceMotion else { return }
+            let duration = Double((textSize.width + 20) / 30)
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(max(0, delayDuration))) }
+                catch { return }
+                guard !Task.isCancelled else { return }
+                withAnimation(.linear(duration: duration)) { offset = -(textSize.width + 20) }
+                do { try await Task.sleep(for: .seconds(duration + 2)) }
+                catch { return }
+                guard !Task.isCancelled else { return }
+                resetOffset()
+            }
+        }
+        .onDisappear { resetOffset() }
+    }
+
+    private func resetOffset() {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { offset = 0 }
     }
 }
 

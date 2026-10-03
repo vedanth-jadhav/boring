@@ -12,10 +12,15 @@ This local build uses a separate app identifier and has no Sparkle updater feed.
 
 Requires Apple Command Line Tools for Xcode 27 with the macOS 27.x SDK and Apple
 Swift 6.4. The app's deployment target remains macOS 14; native notch glass is
-available on macOS 27, with a solid background on older systems. Build and package with:
+available on macOS 27, with a solid background on older systems. Build, replace
+the installed app, and launch the verified version with:
 
 ```sh
-bash Scripts/package_local.sh release
+bash Scripts/install_local.sh release
 ```
+
+Older installed copies are archived outside Applications. During active
+development, use `bash Scripts/install_local.sh debug` after each change so the
+running process is stopped and relaunched from the latest build.
 
 The source is based on [Boring Notch](https://github.com/TheBoredTeam/boring.notch) and includes its upstream license and third-party notices.

@@ -3,6 +3,15 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source Scripts/toolchain.sh
 mkdir -p .spm-generated/helper
+# Removed or moved sources must not survive as stale helper inputs.
+python3 - <<'PY'
+from pathlib import Path
+expected = {source.name for directory in ('BoringNotchXPCHelper', 'Shared')
+            for source in Path(directory).glob('*.swift')}
+for source in Path('.spm-generated/helper').glob('*.swift'):
+    if source.name not in expected:
+        source.unlink()
+PY
 # Keep unchanged helper inputs' timestamps so incremental builds can reuse them.
 for source in BoringNotchXPCHelper/*.swift Shared/*.swift; do
   target=".spm-generated/helper/$(basename "$source")"

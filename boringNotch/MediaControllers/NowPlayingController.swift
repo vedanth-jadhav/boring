@@ -11,6 +11,8 @@ import Foundation
 
 @MainActor
 final class NowPlayingController: NowPlayingRuntimeControlling {
+    private static let timestampFormatter = ISO8601DateFormatter()
+
     func updatePlaybackInfo() async {
         await fetchFavoriteStateIfSupported()
     }
@@ -282,7 +284,7 @@ final class NowPlayingController: NowPlayingRuntimeControlling {
         }
 
         if let dateString = payload.timestamp,
-           let date = ISO8601DateFormatter().date(from: dateString) {
+           let date = Self.timestampFormatter.date(from: dateString) {
             newPlaybackState.lastUpdated = date
         } else if !diff {
             newPlaybackState.lastUpdated = Date()

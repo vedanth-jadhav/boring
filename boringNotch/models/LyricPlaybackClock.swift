@@ -14,6 +14,6 @@ enum LyricPlaybackClock {
     static func needsCorrection(position: Double, sampleDate: Date, anchorPosition: Double,
                                 anchorDate: Date, rate: Double, playing: Bool) -> Bool {
         let estimate = anchorPosition + (playing ? sampleDate.timeIntervalSince(anchorDate) * rate : 0)
-        return abs(position - estimate) > 0.012
+        return abs(position - estimate) > 0.15
     }
 }

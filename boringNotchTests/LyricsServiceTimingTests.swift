@@ -23,6 +23,51 @@ final class LyricsServiceTimingTests: XCTestCase {
         service.clearLyrics()
     }
 
+    func testCachedRowsFollowAdLibBoundariesGapsAndBackwardSeek() async {
+        let service = LyricsService.shared
+        service.clearLyrics()
+        let title = "Frame fixture \(UUID().uuidString)"
+        let lines = [LyricLine(start: 1, end: 5, text: "lead (oh) again (yeah)", words: [
+            .init(text: "lead", start: 1, end: 3),
+            .init(text: "(oh)", start: 2, end: 2.5),
+            .init(text: "again", start: 3, end: 5),
+            .init(text: "(yeah)", start: 4, end: 4.5)
+        ]), LyricLine(start: 6, end: 7, text: "next")]
+        service.setProviderLyrics(lines, title: title, artist: "Fixture")
+        await service.fetchLyrics(bundleIdentifier: nil, title: title, artist: "Fixture")
+        let reference = LyricTimeline(lines: lines)
+        for elapsed in [0.0, 1.5, 2, 2.001, 2.25, 2.499, 2.5, 3, 4, 4.499, 4.5, 6, 7, 8, 2.25, 0] {
+            let actual = service.vocalFrame(at: elapsed, duration: 8)
+            let expected = LyricVocalFrame(entries: reference.displayed(at: elapsed, duration: 8), elapsed: elapsed)
+            XCTAssertEqual(actual.rows.map(\.words), expected.rows.map(\.words), "At \(elapsed)")
+        }
+        XCTAssertTrue(service.vocalFrame(at: .nan, duration: 8).rows.isEmpty)
+        let oldID = service.vocalFrame(at: 2.25, duration: 8).rows[0].id
+        service.clearLyrics()
+        XCTAssertTrue(service.vocalFrame(at: 2.25, duration: 8).rows.isEmpty)
+        let otherTitle = "New frame fixture \(UUID().uuidString)"
+        service.setProviderLyrics(lines, title: otherTitle, artist: "Fixture")
+        await service.fetchLyrics(bundleIdentifier: nil, title: otherTitle, artist: "Fixture")
+        XCTAssertNotEqual(service.vocalFrame(at: 2.25, duration: 8).rows[0].id, oldID)
+        service.clearLyrics()
+    }
+
+    func testLineOnlyScheduleStopsWhenPausedAndHonorsPlaybackSpeed() async {
+        let service = LyricsService.shared
+        service.clearLyrics()
+        let title = "Schedule fixture \(UUID().uuidString)"
+        service.setProviderLyrics([LyricLine(start: 10, end: 12, text: "one two")], title: title, artist: "Fixture")
+        await service.fetchLyrics(bundleIdentifier: nil, title: title, artist: "Fixture")
+        XCTAssertFalse(service.hasWordTimings)
+        XCTAssertFalse(service.vocalFrame(at: 10, duration: 15).rows[0].hasExactTiming)
+        let date = Date()
+        XCTAssertEqual(service.displayDates(anchorPosition: 0, anchorDate: date, rate: 1, playing: false).count, 1)
+        XCTAssertEqual(service.displayDates(anchorPosition: 0, anchorDate: date, rate: 0, playing: true).count, 1)
+        let dates = service.displayDates(anchorPosition: 0, anchorDate: date, rate: 2, playing: true)
+        XCTAssertEqual(dates[1].timeIntervalSince(date), 5, accuracy: 0.000001)
+        service.clearLyrics()
+    }
+
     func testMalformedAlignmentFallsBackWithoutDroppingWords() async {
         let service = LyricsService.shared
         let title = "Invalid fixture \(UUID().uuidString)"

@@ -97,13 +97,9 @@ struct CompactHomeView: View {
                                         ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6) : .gray,
                                     width: textWidth, height: 13)
                     if enableLyrics {
-                        KaraokeLyricsView(width: textWidth, pointSize: 10)
-                            .background {
-                                GeometryReader { proxy in
-                                    Color.clear.preference(key: LyricHeightPreferenceKey.self, value: proxy.size.height)
-                                }
-                            }
-                            .onPreferenceChange(LyricHeightPreferenceKey.self) { lyricContentHeight = $0 }
+                        KaraokeLyricsView(width: textWidth, pointSize: 10) { height in
+                            if lyricContentHeight != height { lyricContentHeight = height }
+                        }
                     }
                 }
                 .frame(width: textWidth, alignment: .leading)
@@ -145,7 +141,7 @@ struct CompactHomeView: View {
     // MARK: - Progress
 
     private var progressRow: some View {
-        MusicPlaybackTimeline(playbackRate: musicManager.playbackRate) { date in
+        MusicPlaybackTimeline(playbackRate: musicManager.playbackRate, isPlaying: musicManager.isPlaying) { date in
             MusicSliderView(
                 sliderValue: $sliderValue,
                 duration: $musicManager.songDuration,
@@ -196,15 +192,11 @@ struct CompactHomeView: View {
 
     private var compactAlbumArt: some View {
         ZStack(alignment: .bottomTrailing) {
-            ZStack {
-                Image(nsImage: musicManager.albumArt)
-                    .resizable().scaledToFill()
-                    .frame(width: albumArtWidth, height: albumArtWidth)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .id(ObjectIdentifier(musicManager.albumArt))
-                    .transition(.opacity)
-            }
-            .animation(.timingCurve(0.22, 1, 0.36, 1, duration: reduceMotion ? 0.15 : 0.65), value: ObjectIdentifier(musicManager.albumArt))
+            Color.clear
+                .frame(width: albumArtWidth, height: albumArtWidth)
+                .anchorPreference(key: AlbumArtworkAnchorKey.self, value: .bounds) {
+                    [.open: $0]
+                }
 
             // Badge scaled to this art. AlbumArtView's is a fixed 30pt with
             // a +10/+10 offset, sized for the 120pt art in the full layout —

@@ -22,7 +22,6 @@ struct MusicPlayerView: View {
         HStack {
             AlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace).frame(width: 120).padding(.all, 5 * (vm.notchSize.height / 190))
             MusicControlsView(horizontalMediaGestureFeedback: horizontalMediaGestureFeedback)
-                .compositingGroup()
         }
         .contentShape(Rectangle())
         .onHover { hovering in
@@ -50,21 +49,11 @@ struct AlbumArtView: View {
     }
 
     private var albumArtBackground: some View {
-        ZStack {
-            Image(nsImage: musicManager.albumArt)
-                .resizable().scaledToFit()
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: MusicPlayerImageSizes.cornerRadiusInset.opened)
-                )
-                .scaleEffect(x: 1.3, y: 1.4)
-                .rotationEffect(.degrees(92))
-                .blur(radius: 40)
-                .opacity(musicManager.isPlaying ? 0.06 : 0)
-                .id(ObjectIdentifier(musicManager.albumArt))
-                .transition(.opacity)
-        }
-        .animation(.easeInOut(duration: reduceMotion ? 0.15 : 0.65), value: ObjectIdentifier(musicManager.albumArt))
+        RadialGradient(colors: [Color(nsColor: musicManager.avgColor).opacity(0.12), .clear],
+                       center: .center, startRadius: 0, endRadius: 95)
+            .scaleEffect(x: 1.3, y: 1.4)
+            .opacity(musicManager.isPlaying ? 1 : 0)
+            .allowsHitTesting(false)
     }
 
     private var albumArtButton: some View {
@@ -78,33 +67,15 @@ struct AlbumArtView: View {
                 }
             }
             .buttonStyle(PlainButtonStyle())
-            .scaleEffect(musicManager.isPlaying ? 1 : 0.85)
-
-            albumArtDarkOverlay
         }
-    }
-
-    private var albumArtDarkOverlay: some View {
-        Rectangle()
-            .foregroundColor(Color.black)
-            .opacity(musicManager.isPlaying ? 0 : 0.8)
-            .blur(radius: 50)
-            .allowsHitTesting(false)
     }
 
     private var albumArtImage: some View {
-        ZStack {
-            Image(nsImage: musicManager.albumArt)
-                .interpolation(.high)
-                .resizable().scaledToFit()
-                .clipShape(
-                    RoundedRectangle(cornerRadius: MusicPlayerImageSizes.cornerRadiusInset.opened)
-                )
-                .id(ObjectIdentifier(musicManager.albumArt))
-                .transition(.opacity)
-        }
-        .animation(.timingCurve(0.22, 1, 0.36, 1, duration: reduceMotion ? 0.15 : 0.65), value: ObjectIdentifier(musicManager.albumArt))
-        .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .anchorPreference(key: AlbumArtworkAnchorKey.self, value: .bounds) {
+                [.open: $0]
+            }
     }
 
     @ViewBuilder
@@ -164,7 +135,7 @@ struct MusicControlsView: View {
     }
 
     private var musicSlider: some View {
-        MusicPlaybackTimeline(playbackRate: musicManager.playbackRate) { date in
+        MusicPlaybackTimeline(playbackRate: musicManager.playbackRate, isPlaying: musicManager.isPlaying) { date in
             MusicSliderView(
                 sliderValue: $sliderValue,
                 duration: $musicManager.songDuration,
@@ -306,16 +277,17 @@ struct MusicControlSlotButton: View {
 
 struct MusicPlaybackTimeline<Content: View>: View {
     let playbackRate: Double
+    let isPlaying: Bool
     @ViewBuilder let content: (Date) -> Content
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: playbackRate > 0 ? musicPlaybackTickInterval : nil)) { context in
+        TimelineView(.animation(minimumInterval: musicPlaybackTickInterval, paused: !isPlaying || playbackRate <= 0)) { context in
             content(context.date)
         }
     }
 }
 
-private let musicPlaybackTickInterval: TimeInterval = 0.2
+private let musicPlaybackTickInterval: TimeInterval = 0.25
 
 struct FavoriteControlButton: View {
     @ObservedObject var musicManager = MusicManager.shared
@@ -605,10 +577,20 @@ struct MusicSliderView: View {
             .foregroundColor(timeLabelColor)
             .font(.caption)
         }
-        .onChange(of: currentDate) {
-           guard !dragging, timestampDate.timeIntervalSince(lastDragged) > -1 else { return }
-            sliderValue = MusicManager.shared.estimatedPlaybackPosition(at: currentDate)
-        }
+        .onChange(of: currentDate) { synchronizePosition(at: currentDate) }
+        // A paused timeline has no date ticks. External seeks and new tracks
+        // must still update its slider from the newly received clock anchor.
+        .onChange(of: elapsedTime) { synchronizePosition(at: .now) }
+        .onChange(of: timestampDate) { synchronizePosition(at: .now) }
+        .onChange(of: isPlaying) { synchronizePosition(at: .now) }
+        .onAppear { synchronizePosition(at: .now) }
+    }
+
+    private func synchronizePosition(at date: Date) {
+        guard !dragging, timestampDate.timeIntervalSince(lastDragged) > -1 else { return }
+        let position = elapsedTime + (isPlaying ? date.timeIntervalSince(timestampDate) * playbackRate : 0)
+        let value = min(max(0, position), duration)
+        if sliderValue != value { sliderValue = value }
     }
 
     private var sliderCore: some View {

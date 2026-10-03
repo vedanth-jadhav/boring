@@ -41,9 +41,11 @@ final class LyricsPrecisionTests: XCTestCase {
         XCTAssertEqual(LyricPlaybackClock.sampleDate(milliseconds: 1, receivedAt: received), received)
     }
 
-    func testSmallClockErrorsAreCorrectedAndPlaybackRateIsRespected() {
+    func testClockJitterIsIgnoredAndPlaybackRateIsRespected() {
         let date = Date(timeIntervalSince1970: 100)
-        XCTAssertTrue(LyricPlaybackClock.needsCorrection(position: 11.03, sampleDate: date.addingTimeInterval(1),
+        XCTAssertFalse(LyricPlaybackClock.needsCorrection(position: 11.03, sampleDate: date.addingTimeInterval(1),
+            anchorPosition: 10, anchorDate: date, rate: 1, playing: true))
+        XCTAssertTrue(LyricPlaybackClock.needsCorrection(position: 11.2, sampleDate: date.addingTimeInterval(1),
             anchorPosition: 10, anchorDate: date, rate: 1, playing: true))
         XCTAssertFalse(LyricPlaybackClock.needsCorrection(position: 12.005, sampleDate: date.addingTimeInterval(1),
             anchorPosition: 10, anchorDate: date, rate: 2, playing: true))
@@ -200,6 +202,42 @@ final class LyricsPrecisionTests: XCTestCase {
             XCTAssertTrue(measure <= 116)
         }
         XCTAssertTrue(layout === LyricTextLayout.cached(words: words, romanize: false, pointSize: 13, width: 120))
+    }
+
+    func testRowLayoutIdentityIncludesTrackAndConfiguration() {
+        let line = LyricLine(start: 1, end: 5, text: "same text")
+        let first = LyricTimeline(lines: [line])
+        let second = LyricTimeline(lines: [line])
+        let row = LyricVocalFrame(entries: first.displayed(at: 2, duration: 6), elapsed: 2).rows[0]
+        let another = LyricVocalFrame(entries: second.displayed(at: 2, duration: 6), elapsed: 2).rows[0]
+        XCTAssertNotEqual(row.id, another.id)
+        let layout = LyricTextLayout.cached(words: row.words, rowID: row.id, romanize: false, pointSize: 13, width: 120)
+        XCTAssertTrue(layout === LyricTextLayout.cached(words: row.words, rowID: row.id, romanize: false, pointSize: 13, width: 120))
+        XCTAssertFalse(layout === LyricTextLayout.cached(words: row.words, rowID: row.id, romanize: false, pointSize: 13, width: 80))
+        XCTAssertFalse(layout === LyricTextLayout.cached(words: row.words, rowID: row.id, romanize: true, pointSize: 13, width: 120))
+        XCTAssertEqual(layout.pageForWord.count, row.words.count)
+    }
+
+    func testPreparedAnchorPreservesSourceOrderForOverlappingWords() {
+        let words: [LyricLine.Word] = [
+            .init(text: "first", start: 1, end: 2),
+            .init(text: "later", start: 4, end: 5),
+            .init(text: "overlap", start: 2, end: 6),
+            .init(text: "same stamp", start: 2, end: 3)
+        ]
+        let row = LyricVocalFrame.Row(id: "fixture", words: words, isBackground: false, hasExactTiming: true)
+        for elapsed in [0.0, 1, 1.999, 2, 3, 4, 5, 7, 2, .nan] {
+            XCTAssertEqual(row.anchor(at: elapsed), words.lastIndex { elapsed >= $0.start } ?? 0)
+        }
+    }
+
+    func testFrameBucketsDoNotChangeAcrossContiguousWords() {
+        let timeline = LyricTimeline(lines: [LyricLine(start: 1, end: 4, text: "one two three", words: [
+            .init(text: "one", start: 1, end: 2), .init(text: "two", start: 2, end: 3),
+            .init(text: "three", start: 3, end: 4)
+        ])])
+        XCTAssertEqual(timeline.displayBucket(at: 1.5), timeline.displayBucket(at: 3.5))
+        XCTAssertNotEqual(timeline.displayBucket(at: 3.5), timeline.displayBucket(at: 4))
     }
 
     func testHinglishPreservesWordsFormattingAndMixedEnglish() {

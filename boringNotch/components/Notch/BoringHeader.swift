@@ -11,12 +11,13 @@ import SwiftUI
 struct BoringHeader: View {
     @EnvironmentObject var vm: BoringViewModel
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
+    @ObservedObject private var focus = FocusSessionManager.shared
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @StateObject var shelfState = ShelfStateViewModel.shared
     var body: some View {
         HStack(spacing: 0) {
             HStack {
-                if (!shelfState.isEmpty || coordinator.alwaysShowTabs) && Defaults[.boringShelf] {
+                if vm.notchState == .open {
                     TabSelectionView()
                 } else if vm.notchState == .open {
                     EmptyView()
@@ -38,6 +39,10 @@ struct BoringHeader: View {
 
             HStack(spacing: 4) {
                 if vm.notchState == .open {
+                    if focus.isActive {
+                        FocusActivityAnchor(width: FocusActivityMetrics.width(for: focus.session.duration))
+                            .padding(.trailing, 4)
+                    }
                     if isOSDType(coordinator.sneakPeekState(for: vm.screenUUID).type) && coordinator.shouldShowSneakPeek(on: vm.screenUUID) && Defaults[.showOpenNotchOSD] {
                         OpenNotchOSD(
                              type: coordinator.binding(for: vm.screenUUID).type,

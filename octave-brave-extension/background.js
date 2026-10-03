@@ -36,6 +36,9 @@ function connect() {
     if (activeTab !== null) {
       port.postMessage({type: "state", ...lastState.get(activeTab)});
       publishCachedLyrics(activeTab);
+      // Cached anchors can be several seconds old after native reconnect.
+      // Ask the media element for a fresh sample immediately.
+      chrome.tabs.sendMessage(activeTab, {type: "command", action: "refresh"}).catch(() => {});
     }
   } catch (_) {
     reconnectTimer = setTimeout(connect, 1500);

@@ -92,6 +92,19 @@ final class BoringViewCoordinator: ObservableObject {
     private var osdReplacementCancellable: AnyCancellable?
     private var boringShelfCancellable: AnyCancellable?
     private var osdSourceCancellables: [AnyCancellable] = []
+    /// One policy for every screen; notification state never opens a workspace
+    /// or overrides the battery / brightness / volume HUD.
+    @MainActor func notificationPresentation(for vm: BoringViewModel, dragging: Bool) -> NotificationPresentationPolicy.Mode {
+        NotificationPresentationPolicy.mode(
+            hasNotifications: NotificationManager.shared.isPresented && !NotificationManager.shared.state.notifications.isEmpty,
+            unavailable: NotificationManager.shared.availability == .disabled || NotificationManager.shared.availability == .suspended,
+            hidden: vm.hideOnClosed && vm.notchState == .closed,
+            onboarding: helloAnimationRunning,
+            dragging: dragging,
+            workspaceOpen: vm.notchState == .open,
+            systemHUD: (expandingView.show && expandingView.type == .battery) || shouldShowSneakPeek(on: vm.screenUUID))
+    }
+
     private var notificationLiveActivityCancellable: AnyCancellable?
     private var uiEventCancellable: AnyCancellable?
 
@@ -133,7 +146,6 @@ final class BoringViewCoordinator: ObservableObject {
                     }
                 } else {
                     MediaKeyInterceptor.shared.stop()
-                    SystemNotificationManager.shared.stop()
                 }
             }
         }

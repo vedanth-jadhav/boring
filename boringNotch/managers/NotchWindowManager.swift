@@ -9,6 +9,7 @@
 //  glue (shortcuts, onboarding, termination) and forwards to this manager.
 //
 
+import Combine
 import Defaults
 import SwiftUI
 
@@ -31,9 +32,16 @@ final class NotchWindowManager {
     private(set) var isScreenLocked: Bool = false
     private var windowScreenDidChangeObserver: Any?
     private var previousScreens: [NSScreen]?
+    private var caffeineObservers: Set<AnyCancellable> = []
 
     init(camera: CameraModel) {
         primaryViewModel = BoringViewModel(camera: camera)
+        MusicManager.shared.$isPlaying.removeDuplicates().receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateLockScreenCaffeine() }
+            .store(in: &caffeineObservers)
+        Defaults.publisher(.showOnLockScreen).receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateLockScreenCaffeine() }
+            .store(in: &caffeineObservers)
     }
 
     // MARK: - Public lookups (preserve AppDelegate's old API shape)
@@ -52,6 +60,7 @@ final class NotchWindowManager {
 
     func screenLocked() {
         isScreenLocked = true
+        updateLockScreenCaffeine()
         if !Defaults[.showOnLockScreen] {
             cleanupWindows()
         } else {
@@ -61,11 +70,20 @@ final class NotchWindowManager {
 
     func screenUnlocked() {
         isScreenLocked = false
+        updateLockScreenCaffeine()
         if !Defaults[.showOnLockScreen] {
             adjustWindowPosition(changeAlpha: true)
             setupDragDetectors()
         } else {
             disableSkyLightOnAllWindows()
+        }
+    }
+
+    private func updateLockScreenCaffeine() {
+        if isScreenLocked && Defaults[.showOnLockScreen] && MusicManager.shared.isPlaying {
+            CaffeineManager.shared.acquire(owner: .lockScreen)
+        } else {
+            CaffeineManager.shared.release(owner: .lockScreen)
         }
     }
 
@@ -128,8 +146,10 @@ final class NotchWindowManager {
     }
 
     private func createBoringNotchWindow(for screen: NSScreen, with viewModel: BoringViewModel) -> NSWindow {
-        let rect = NSRect(x: 0, y: 0, width: windowSize.width, height: windowSize.height)
-        let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel, .utilityWindow, .hudWindow]
+        let rect = NSRect(x: 0, y: 0, width: min(windowSize.width, screen.frame.width), height: windowSize.height)
+        // HUD/utility styling can draw a bezel around the transparent panel's
+        // full bounds. SwiftUI draws the notch surface; its host needs no frame.
+        let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
 
         let window = BoringNotchSkyLightWindow(contentRect: rect, styleMask: styleMask, backing: .buffered, defer: false)
 
@@ -140,10 +160,19 @@ final class NotchWindowManager {
             window.disableSkyLight()
         }
 
-        window.contentView = NSHostingView(
+        let hostingView = NSHostingView(
             rootView: ContentView()
                 .environmentObject(viewModel)
         )
+        // The large canvas includes transparent space for activities. Keep
+        // AppKit's layer and keyboard focus decoration entirely transparent.
+        hostingView.focusRingType = .none
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        hostingView.layer?.borderWidth = 0
+        hostingView.layer?.shadowOpacity = 0
+        window.contentView = hostingView
+        window.hasShadow = false
 
         window.orderFrontRegardless()
         NotchSpaceManager.shared.notchSpace.windows.insert(window)
@@ -394,6 +423,8 @@ final class NotchWindowManager {
     }
 
     func cleanup() {
+        caffeineObservers.removeAll()
+        CaffeineManager.shared.release(owner: .lockScreen)
         cleanupDragDetectors()
         cleanupWindows()
     }

@@ -7,7 +7,26 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F0C050000000000000000006 /* CenteredRulerSnapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C050000000000000000005 /* CenteredRulerSnapping.swift */; };
+		F0C050000000000000000004 /* FocusActivityMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C050000000000000000003 /* FocusActivityMetrics.swift */; };
+		F0C050000000000000000002 /* FocusDurationSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C050000000000000000001 /* FocusDurationSelection.swift */; };
+		934AF3EACD56292A4CF9844B /* DurationRuler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90D78D219C4FCEF3132F1CA7 /* DurationRuler.swift */; };
+		A4530C9424190D919D90DC18 /* DurationRulerTick.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E62F8FA0631983362371581 /* DurationRulerTick.swift */; };
+		48D86350106B0E28AC394074 /* FocusActivityAnchor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBD72FCF882F0A877FE1F1D0 /* FocusActivityAnchor.swift */; };
+		38031C3F5BC696993DCE4E3C /* FocusActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E276BA3E9B951CF6A6A208 /* FocusActivityView.swift */; };
+		7863D2CA65AEB99CE4E32230 /* FocusControlSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35CCAACE591DBF97B10BB31 /* FocusControlSurface.swift */; };
+		AD4DFB18AFFBC4BEB64B4B81 /* FocusHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4879A6C9BD3ABFF8B34FC1C2 /* FocusHaptics.swift */; };
+		FC0C9DA827C5062CC7A48CB2 /* FocusTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3977BA4649149582C63FC50 /* FocusTimerView.swift */; };
+		EE462559C284380876E8B8CF /* RulerMouseDrag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C491527A6664AB55E1EF095 /* RulerMouseDrag.swift */; };
+		D058D122B9FEB4078CF21BD3 /* CaffeineManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96846D5FA83E56257748725A /* CaffeineManager.swift */; };
+		809D1FCB23BD0F1AF2483C6D /* FocusPowerManaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 493E87F6EBBCFAEC57972E82 /* FocusPowerManaging.swift */; };
+		56912596834768394C892BDD /* FocusSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2676961E59CD254B7ADDCDF5 /* FocusSessionManager.swift */; };
+		35A67E63851603A802FAC83C /* FocusSessionMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804554FE4B723C9F31759460 /* FocusSessionMode.swift */; };
+		C8D42DB50226786007D6A5EE /* FocusSessionSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63784315B37D65451E89E42 /* FocusSessionSnapshot.swift */; };
+		507EE32BF19C30BB387634F9 /* FocusSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75EF7BCC5E5F35D4ABFFBA12 /* FocusSessionState.swift */; };
 		C02700000000000000000001 /* LiquidGlassBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02700000000000000000002 /* LiquidGlassBackground.swift */; };
+		C02700000000000000000006 /* NativeNotchGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02700000000000000000007 /* NativeNotchGlass.swift */; };
+		C02700000000000000000008 /* NotchGlassDimming.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02700000000000000000009 /* NotchGlassDimming.swift */; };
 		C02700000000000000000003 /* ViewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C02700000000000000000004 /* ViewState.swift */; };
 		07FE456E7AEA085D9FCA6D97 /* MeetingLinkDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B2A5E5F4D28F1DD9CD0B09 /* MeetingLinkDetector.swift */; };
 		110029272E84FD4C00035A57 /* TemporaryFileStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110029262E84FD4C00035A57 /* TemporaryFileStorageService.swift */; };
@@ -191,7 +210,26 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F0C050000000000000000005 /* CenteredRulerSnapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/CenteredRulerSnapping.swift; sourceTree = SOURCE_ROOT; };
+		F0C050000000000000000003 /* FocusActivityMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/FocusActivityMetrics.swift; sourceTree = SOURCE_ROOT; };
+		F0C050000000000000000001 /* FocusDurationSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/models/FocusDurationSelection.swift; sourceTree = SOURCE_ROOT; };
+		90D78D219C4FCEF3132F1CA7 /* DurationRuler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/DurationRuler.swift; sourceTree = SOURCE_ROOT; };
+		0E62F8FA0631983362371581 /* DurationRulerTick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/DurationRulerTick.swift; sourceTree = SOURCE_ROOT; };
+		CBD72FCF882F0A877FE1F1D0 /* FocusActivityAnchor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/FocusActivityAnchor.swift; sourceTree = SOURCE_ROOT; };
+		A6E276BA3E9B951CF6A6A208 /* FocusActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/FocusActivityView.swift; sourceTree = SOURCE_ROOT; };
+		D35CCAACE591DBF97B10BB31 /* FocusControlSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/FocusControlSurface.swift; sourceTree = SOURCE_ROOT; };
+		4879A6C9BD3ABFF8B34FC1C2 /* FocusHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/FocusHaptics.swift; sourceTree = SOURCE_ROOT; };
+		F3977BA4649149582C63FC50 /* FocusTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/FocusTimerView.swift; sourceTree = SOURCE_ROOT; };
+		5C491527A6664AB55E1EF095 /* RulerMouseDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/RulerMouseDrag.swift; sourceTree = SOURCE_ROOT; };
+		96846D5FA83E56257748725A /* CaffeineManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/managers/CaffeineManager.swift; sourceTree = SOURCE_ROOT; };
+		493E87F6EBBCFAEC57972E82 /* FocusPowerManaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/managers/FocusPowerManaging.swift; sourceTree = SOURCE_ROOT; };
+		2676961E59CD254B7ADDCDF5 /* FocusSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/managers/FocusSessionManager.swift; sourceTree = SOURCE_ROOT; };
+		804554FE4B723C9F31759460 /* FocusSessionMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/models/FocusSessionMode.swift; sourceTree = SOURCE_ROOT; };
+		F63784315B37D65451E89E42 /* FocusSessionSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/models/FocusSessionSnapshot.swift; sourceTree = SOURCE_ROOT; };
+		75EF7BCC5E5F35D4ABFFBA12 /* FocusSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/models/FocusSessionState.swift; sourceTree = SOURCE_ROOT; };
 		C02700000000000000000002 /* LiquidGlassBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassBackground.swift; sourceTree = "<group>"; };
+		C02700000000000000000007 /* NativeNotchGlass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeNotchGlass.swift; sourceTree = "<group>"; };
+		C02700000000000000000009 /* NotchGlassDimming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchGlassDimming.swift; sourceTree = "<group>"; };
 		C02700000000000000000004 /* ViewState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewState.swift; sourceTree = "<group>"; };
 		0268933F488E47DFB58E48CF /* VisualEffectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectView.swift; sourceTree = "<group>"; };
 		033B8885979E4EA1A78E8ADC /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
@@ -336,6 +374,7 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+        ABN000000000000000000001 /* Notifications */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = boringNotch/Notifications; sourceTree = SOURCE_ROOT; };
 		112FB72F2CCF12CC0015238C /* private */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = private; sourceTree = "<group>"; };
 		11DAAB303061BDED00E15887 /* Settings */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Settings; sourceTree = "<group>"; };
 		11DAAB463061BE1600E15887 /* LiveActivities */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = LiveActivities; sourceTree = "<group>"; };
@@ -571,6 +610,8 @@
 			isa = PBXGroup;
 			children = (
 				C02700000000000000000002 /* LiquidGlassBackground.swift */,
+				C02700000000000000000007 /* NativeNotchGlass.swift */,
+				C02700000000000000000009 /* NotchGlassDimming.swift */,
 				11985BDF2F37A3C800F81585 /* OSD */,
 				B141C23B2CA5F50900AC8CC8 /* Onboarding */,
 				14C08BB72C8DE49E000F8AA0 /* Calendar */,
@@ -649,6 +690,23 @@
 		14CEF4142C5CAED300855D72 /* boringNotch */ = {
 			isa = PBXGroup;
 			children = (
+				F0C050000000000000000005 /* CenteredRulerSnapping.swift */,
+				F0C050000000000000000003 /* FocusActivityMetrics.swift */,
+				F0C050000000000000000001 /* FocusDurationSelection.swift */,
+				90D78D219C4FCEF3132F1CA7 /* DurationRuler.swift */,
+				0E62F8FA0631983362371581 /* DurationRulerTick.swift */,
+				CBD72FCF882F0A877FE1F1D0 /* FocusActivityAnchor.swift */,
+				A6E276BA3E9B951CF6A6A208 /* FocusActivityView.swift */,
+				D35CCAACE591DBF97B10BB31 /* FocusControlSurface.swift */,
+				4879A6C9BD3ABFF8B34FC1C2 /* FocusHaptics.swift */,
+				F3977BA4649149582C63FC50 /* FocusTimerView.swift */,
+				5C491527A6664AB55E1EF095 /* RulerMouseDrag.swift */,
+				96846D5FA83E56257748725A /* CaffeineManager.swift */,
+				493E87F6EBBCFAEC57972E82 /* FocusPowerManaging.swift */,
+				2676961E59CD254B7ADDCDF5 /* FocusSessionManager.swift */,
+				804554FE4B723C9F31759460 /* FocusSessionMode.swift */,
+				F63784315B37D65451E89E42 /* FocusSessionSnapshot.swift */,
+				75EF7BCC5E5F35D4ABFFBA12 /* FocusSessionState.swift */,
 				11F748672EC9AC9600F841DB /* XPCHelperClient */,
 				116398942DF5D6B40052E6AF /* Providers */,
 				14288DE22C6E016F00B9F80C /* observers */,
@@ -739,6 +797,7 @@
 		600E881A3042DEAD00B17BFC /* Recovered References */ = {
 			isa = PBXGroup;
 			children = (
+                ABN000000000000000000001 /* Notifications */,
 				8137A8BA990F4D9CBA56CC7A /* Shared */,
 			);
 			name = "Recovered References";
@@ -848,6 +907,7 @@
 				11F7485A2EC9AABA00F841DB /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+                ABN000000000000000000001 /* Notifications */,
 				112FB72F2CCF12CC0015238C /* private */,
 				11DAAB303061BDED00E15887 /* Settings */,
 				11DAAB463061BE1600E15887 /* LiveActivities */,
@@ -994,6 +1054,23 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F0C050000000000000000006 /* CenteredRulerSnapping.swift in Sources */,
+				F0C050000000000000000004 /* FocusActivityMetrics.swift in Sources */,
+				F0C050000000000000000002 /* FocusDurationSelection.swift in Sources */,
+				934AF3EACD56292A4CF9844B /* DurationRuler.swift in Sources */,
+				A4530C9424190D919D90DC18 /* DurationRulerTick.swift in Sources */,
+				48D86350106B0E28AC394074 /* FocusActivityAnchor.swift in Sources */,
+				38031C3F5BC696993DCE4E3C /* FocusActivityView.swift in Sources */,
+				7863D2CA65AEB99CE4E32230 /* FocusControlSurface.swift in Sources */,
+				AD4DFB18AFFBC4BEB64B4B81 /* FocusHaptics.swift in Sources */,
+				FC0C9DA827C5062CC7A48CB2 /* FocusTimerView.swift in Sources */,
+				EE462559C284380876E8B8CF /* RulerMouseDrag.swift in Sources */,
+				D058D122B9FEB4078CF21BD3 /* CaffeineManager.swift in Sources */,
+				809D1FCB23BD0F1AF2483C6D /* FocusPowerManaging.swift in Sources */,
+				56912596834768394C892BDD /* FocusSessionManager.swift in Sources */,
+				35A67E63851603A802FAC83C /* FocusSessionMode.swift in Sources */,
+				C8D42DB50226786007D6A5EE /* FocusSessionSnapshot.swift in Sources */,
+				507EE32BF19C30BB387634F9 /* FocusSessionState.swift in Sources */,
 				115C12EC2ED3D003009754CA /* OpenNotchOSD.swift in Sources */,
 				14C08BB92C8DE4B1000F8AA0 /* BoringCalendar.swift in Sources */,
 				5955950D2E900ED800C66711 /* ApplicationRelauncher.swift in Sources */,
@@ -1077,6 +1154,8 @@
 				507266DB2C908E2E00A2D00D /* HoverButton.swift in Sources */,
 				1A8B65187F974EE9B7664F5C /* VisualEffectView.swift in Sources */,
 				C02700000000000000000001 /* LiquidGlassBackground.swift in Sources */,
+				C02700000000000000000006 /* NativeNotchGlass.swift in Sources */,
+				C02700000000000000000008 /* NotchGlassDimming.swift in Sources */,
 				C02700000000000000000003 /* ViewState.swift in Sources */,
 				14CEF4182C5CAED300855D72 /* ContentView.swift in Sources */,
 				9A987A0D2C73CA66005CA465 /* ShelfView.swift in Sources */,
@@ -1354,7 +1433,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSBackgroundOnly = NO;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "This app uses AppleEvents to control music";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Controls music playback.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "This app uses the calendar to display your calendar events";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to display a live camera view";
 				INFOPLIST_KEY_NSContactsUsageDescription = "This app matches notification senders to your contacts to show their photo";
@@ -1423,7 +1502,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSBackgroundOnly = NO;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "This app uses AppleEvents to control music";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Controls music playback.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "This app uses the calendar to display your calendar events";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to display a live camera view";
 				INFOPLIST_KEY_NSContactsUsageDescription = "This app matches notification senders to your contacts to show their photo";

@@ -667,10 +667,12 @@ final class MusicManager: ObservableObject {
     }
 
     private func updateArtwork(_ artworkData: Data) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
 
-            if let artworkImage = NSImage(data: artworkData) {
+            // Decode the display-sized thumbnail directly from the source,
+            // avoiding a full-resolution bitmap and its color-analysis cost.
+            if let artworkImage = NSImage.downsampledArtwork(from: artworkData) {
                 DispatchQueue.main.async { [weak self] in
                     guard let self, self.artworkData == artworkData else { return }
                     self.usingAppIconForArtwork = false

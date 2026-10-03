@@ -1,3 +1,4 @@
+import Defaults
 import SwiftUI
 
 /// One native optical surface. Smoke keeps the notch connection black while
@@ -7,6 +8,7 @@ struct LiquidGlassSurface<Content: View>: View {
     var expanded: Bool
     @ViewBuilder var content: Content
 
+    @Default(.reduceGlass) private var reduceGlass
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -24,7 +26,10 @@ struct LiquidGlassSurface<Content: View>: View {
     }
 
     var body: some View {
-        if #available(macOS 27.0, *), !reduceTransparency {
+        if #available(macOS 27.0, *), !reduceTransparency, !reduceGlass {
+            // Opening and closing must preserve this branch's identity.
+            // Switching to the solid branch on close replaces the whole
+            // content tree and crossfades two surfaces instead of resizing one.
             // Keep content, sizing, matched geometry and material in the same
             // layout tree. A nested NSHostingController re-lays out its content
             // against intermediate AppKit bounds during expansion, which makes
@@ -32,8 +37,9 @@ struct LiquidGlassSurface<Content: View>: View {
             content
                 .padding(.horizontal, shape.topCornerRadius)
                 .background { smoke }
-                .glassEffect(.clear, in: shape)
-                .clipShape(shape)
+                // Identity disables the optical effect while retaining the
+                // content's structural identity throughout open/close.
+                .glassEffect(expanded ? .clear : .identity, in: shape)
         } else {
             // Solid accessibility/older-system fallback, with no legacy blur.
             content

@@ -1,7 +1,8 @@
 # Local Octave build
 
 This build is for macOS and Octave in Brave Browser. It uses a separate app ID,
-`local.vedanth.boringnotch.octave`, so it can coexist with the upstream app.
+`local.vedanth.boringnotch.octave`. The local installer maintains one active
+copy in `/Applications/Boring Notch Octave.app`.
 
 ## Build and install
 
@@ -26,12 +27,21 @@ The packaging script creates a stable, trusted local code signing identity the f
 time it runs.
 
 ```sh
-bash Scripts/package_local.sh release
+bash Scripts/install_local.sh release
 bash Scripts/install_octave_bridge.sh
-open "$HOME/Applications/Boring Notch Octave.app"
 ```
 
-For faster local development, pass `debug` to `package_local.sh`. Builds reuse
+The bridge installer uses `Scripts/install_local.sh --skip-build` to stop running
+Boring Notch copies, archive older installed bundles under
+`~/Library/Application Support/Boring Notch/Archived Builds`, install the signed
+bundle in `/Applications`, and launch it. It verifies the installed executable's
+checksum and that exactly one instance runs from that path. To build, install,
+and launch without reinstalling the browser bridge, run
+`bash Scripts/install_local.sh release`.
+
+For active development, use `bash Scripts/install_local.sh debug` after changes.
+It rebuilds, stops the running app, archives duplicate bundles, installs the
+fresh build, and launches it from `/Applications`. Builds reuse
 `.build` and cached dependencies, preserve unchanged helper inputs, and use one
 build job by default to limit CPU load. Swift compiler jobs and threads are
 also limited to one, and builds run at lower scheduling priority (`nice 10`).
@@ -47,7 +57,7 @@ some Brave versions.
 1. Open `brave://extensions` in the Brave profile where you use Octave.
 2. Turn on **Developer mode**, then select **Load unpacked**.
 3. Select this repository's `octave-brave-extension` folder, or the bundled
-   extension folder in `~/Applications/Boring Notch Octave.app/Contents/Resources/`.
+   extension folder in `/Applications/Boring Notch Octave.app/Contents/Resources/`.
 4. Reload the Octave tab.
 5. Select **Octave in Brave** as Boring Notch's music source.
 

@@ -26,7 +26,12 @@ final class XPCHelperClient: NSObject, ObservableObject {
         super.init()
     }
 
-    private let serviceName = "theboringteam.boringnotch.BoringNotchXPCHelper"
+    private var serviceName: String {
+        if Bundle.main.object(forInfoDictionaryKey: "BNLocalBuild") as? Bool == true,
+           let id = Bundle.main.bundleIdentifier { return id + ".BoringNotchXPCHelper" }
+        return "theboringteam.boringnotch.BoringNotchXPCHelper"
+    }
+    private var authorizationMonitorTask: Task<Void, Never>?
 
     /// Coarse, UI-friendly view of helper connectivity. Flips to false from
     /// the connection's interruption/invalidation handlers so a crashed
@@ -140,12 +145,24 @@ final class XPCHelperClient: NSObject, ObservableObject {
         ) { [weak self] _ in
             Task { _ = await self?.isAccessibilityAuthorized() }
         }
+        // Trust has no public change event. A coalescible, infrequent check
+        // catches revocation even when this accessory app never activates.
+        authorizationMonitorTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(60), tolerance: .seconds(10)) }
+                catch { return }
+                guard !Task.isCancelled else { return }
+                _ = await self?.isAccessibilityAuthorized()
+            }
+        }
         // Initial probe so observers get the current state without waiting
         // for the first activation.
         Task { _ = await isAccessibilityAuthorized() }
     }
 
     func stopMonitoringAccessibilityAuthorization() {
+        authorizationMonitorTask?.cancel()
+        authorizationMonitorTask = nil
         guard let activationObserver else { return }
         NotificationCenter.default.removeObserver(activationObserver)
         self.activationObserver = nil
@@ -390,9 +407,10 @@ final class NotificationXPCDelegate: NSObject, BoringNotchXPCAppDelegate {
     }
 
     func notificationDidAppear(_ payload: [String: String]) {
-        NotificationCenter.default.post(
-            name: .systemNotificationDidAppear, object: nil, userInfo: payload
-        )
+        guard let json = payload["event"], let data = json.data(using: .utf8),
+              let event = try? JSONDecoder().decode(NotificationSourceEvent.self, from: data), event.version == 2 else { return }
+        // Decoding occurs on the XPC delivery queue; SwiftUI receives values.
+        NotificationCenter.default.post(name: .systemNotificationDidAppear, object: event)
     }
 }
 
@@ -411,17 +429,34 @@ extension XPCHelperClient {
         }
     }
 
-    nonisolated func setNotificationFilter(bundleIDs: Set<String>, allApps: Bool) {
-        Task {
+    #if DEBUG
+    nonisolated func notificationObservationDiagnostics() async -> [String: String] {
+        do {
             let service = await MainActor.run { ensureRemoteService() }
-            do {
-                try await service.withService {
-                    $0.setNotificationFilter(Array(bundleIDs), allApps: allApps)
-                }
-            } catch {
-                await MainActor.run { self.lastError = .transport(underlying: error) }
+            return try await service.withContinuation { service, continuation in
+                service.notificationObservationDiagnostics { continuation.resume(returning: $0) }
             }
-        }
+        } catch { return ["error": error.localizedDescription] }
+    }
+    #endif
+    func suppressNativeNotification(_ notification: MirroredNotification) async -> Bool {
+        guard let data = try? JSONEncoder().encode(notification) else { return false }
+        do {
+            let service = ensureRemoteService()
+            return try await service.withContinuation { service, continuation in
+                service.suppressNativeNotification(data) { continuation.resume(returning: $0) }
+            }
+        } catch { return false }
+    }
+    nonisolated func configureNotificationSource(allowed: Set<String>, allApps: Bool, ignored: Set<String>) async {
+        do {
+            let service = await MainActor.run { ensureRemoteService() }
+            let _: Void = try await service.withContinuation { service, continuation in
+                service.configureNotificationCapture(Array(allowed), allApps: allApps, ignored: Array(ignored)) {
+                    continuation.resume(returning: ())
+                }
+            }
+        } catch { await MainActor.run { self.lastError = .transport(underlying: error) } }
     }
 
     nonisolated func stopNotificationWatching() {

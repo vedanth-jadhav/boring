@@ -10,6 +10,7 @@ import AppKit
 import Cocoa
 import Foundation
 import CoreImage
+import ImageIO
 import CoreGraphics
 import CoreImage.CIFilterBuiltins
 
@@ -20,13 +21,28 @@ private struct AverageColorComponents: Sendable {
 }
 
 extension NSImage {
+    nonisolated static func downsampledArtwork(from data: Data, maxPixelSize: Int = 256) -> NSImage? {
+        guard maxPixelSize > 0 else { return nil }
+        if let source = CGImageSourceCreateWithData(data as CFData, nil),
+           let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                kCGImageSourceShouldCacheImmediately: true
+           ] as CFDictionary) {
+            return NSImage(cgImage: thumbnail, size: .zero)
+        }
+        // Retain support for AppKit-only artwork formats (e.g. PDF).
+        return NSImage(data: data)
+    }
+
     @MainActor
     func averageColor() async -> NSColor? {
         guard let cgImage = cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return nil
         }
 
-        let components = await Task.detached(priority: .userInitiated) {
+        let components = await Task.detached(priority: .utility) {
             Self.averageColorComponents(for: cgImage)
         }.value
 
@@ -43,8 +59,9 @@ extension NSImage {
     }
 
     nonisolated private static func averageColorComponents(for cgImage: CGImage) -> AverageColorComponents? {
-        let width = cgImage.width
-        let height = cgImage.height
+        let scale = min(1, 64 / Double(max(cgImage.width, cgImage.height, 1)))
+        let width = max(1, Int(Double(cgImage.width) * scale))
+        let height = max(1, Int(Double(cgImage.height) * scale))
         let totalPixels = width * height
 
         guard totalPixels > 0,

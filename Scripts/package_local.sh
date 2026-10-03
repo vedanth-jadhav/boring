@@ -82,15 +82,18 @@ done
 iconutil -c icns "$iconset" -o "$app/Contents/Resources/BoringNotch.icns"
 
 python3 - "$app" <<'PY'
-import pathlib, plistlib, sys
+import datetime, pathlib, plistlib, sys
 app=pathlib.Path(sys.argv[1]); contents=app/'Contents'
+build_date = datetime.datetime.now(datetime.timezone.utc)
+build_version = build_date.strftime('%Y%m%d%H%M%S')
 info={
   'CFBundleName':'Boring Notch Octave','CFBundleDisplayName':'Boring Notch Octave',
   'CFBundleIdentifier':'local.vedanth.boringnotch.octave',
   'CFBundleExecutable':'boringNotch','CFBundlePackageType':'APPL',
-  'CFBundleShortVersionString':'2.8.1-local','CFBundleVersion':'1',
+  'CFBundleShortVersionString':'2.8.1-local','CFBundleVersion':build_version,
+  'BNLocalBuildDate':build_date.isoformat(),
   'LSMinimumSystemVersion':'14.0','LSUIElement':True,
-  'CFBundleIconFile':'BoringNotch.icns','NSAppleEventsUsageDescription':'Controls supported music apps.',
+  'CFBundleIconFile':'BoringNotch.icns','NSAppleEventsUsageDescription':'Controls music playback.',
   'NSAudioCaptureUsageDescription':'Displays a waveform for the selected music source.',
   'NSCameraUsageDescription':'Displays the camera in the notch.',
   'NSContactsUsageDescription':'Matches contacts to notifications.',
@@ -103,7 +106,7 @@ info={
 helper=contents/'XPCServices/BoringNotchXPCHelper.xpc/Contents'
 h={'CFBundleIdentifier':'local.vedanth.boringnotch.octave.BoringNotchXPCHelper',
    'CFBundleExecutable':'BoringNotchXPCHelper','CFBundlePackageType':'XPC!',
-   'CFBundleShortVersionString':'2.8.1-local','CFBundleVersion':'1',
+   'CFBundleShortVersionString':'2.8.1-local','CFBundleVersion':build_version,
    'XPCService':{'ServiceType':'Application'},
    'NSAppleEventsUsageDescription':'Replies to messages at your request.'}
 (helper/'Info.plist').write_bytes(plistlib.dumps(h))

@@ -100,18 +100,19 @@ final class OctaveController: MediaControllerProtocol {
         if let volume = message["volume"] as? Double, volume.isFinite {
             state.volume = min(1, max(0, volume))
         }
-        state.playbackRate = message["rate"] as? Double ?? 1
+        let rate = message["rate"] as? Double ?? 1
+        state.playbackRate = rate.isFinite && rate >= 0 ? rate : 1
         state.isShuffled = message["shuffle"] as? Bool ?? false
         state.isSmartShuffled = message["smartShuffle"] as? Bool ?? false
         state.bundleIdentifier = MediaAppBundleID.brave
         state.audioCaptureBundleIdentifiers = [MediaAppBundleID.braveAudioHelper, MediaAppBundleID.brave]
         let now = Date()
         let sampleDate = LyricPlaybackClock.sampleDate(milliseconds: message["sampledAt"] as? Double, receivedAt: now)
-        let meaningfulPosition = trackChanged || LyricPlaybackClock.needsCorrection(
+        let meaningfulPosition = trackChanged || message["clockDiscontinuity"] as? Bool == true || LyricPlaybackClock.needsCorrection(
             position: state.currentTime, sampleDate: sampleDate,
             anchorPosition: playbackState.currentTime, anchorDate: playbackState.lastUpdated,
             rate: playbackState.playbackRate, playing: playbackState.isPlaying)
-            || now.timeIntervalSince(lastPositionPublish) > 0.75
+            || playing && now.timeIntervalSince(lastPositionPublish) >= 5
         let metadataChanged = state.title != playbackState.title || state.artist != playbackState.artist
             || state.album != playbackState.album || state.duration != playbackState.duration
             || state.isPlaying != playbackState.isPlaying || state.playbackRate != playbackState.playbackRate

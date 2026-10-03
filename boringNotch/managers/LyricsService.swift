@@ -17,9 +17,10 @@ final class LyricsService: ObservableObject {
     @Published var isFetchingLyrics: Bool = false
     @Published var syncedLyrics: [(time: Double, text: String)] = []
     @Published private(set) var timedLyrics: [LyricLine] = [] {
-        didSet { timeline = LyricTimeline(lines: timedLyrics) }
+        didSet { timeline = LyricTimeline(lines: timedLyrics); cachedFrame = nil }
     }
     private var timeline = LyricTimeline(lines: [])
+    private var cachedFrame: (bucket: Int, duration: Double, frame: LyricVocalFrame)?
 
     // Cache to avoid redundant fetches; NSCache evicts under memory pressure
     // instead of growing for the whole session.
@@ -77,6 +78,8 @@ final class LyricsService: ObservableObject {
             if preferProvider {
                 do { try await Task.sleep(for: .seconds(2)) }
                 catch { return }
+                guard !Task.isCancelled, self.activeCacheKey == cacheKey,
+                      self.lyricsCache.object(forKey: cacheKey as NSString) == nil else { return }
             }
 
             // Try Apple Music first if applicable
@@ -164,6 +167,29 @@ final class LyricsService: ObservableObject {
 
     func displayedLines(at elapsed: Double, duration: Double) -> [LyricTimeline.Entry] {
         timeline.displayed(at: elapsed, duration: duration)
+    }
+
+    func vocalFrame(at elapsed: Double, duration: Double) -> LyricVocalFrame {
+        guard elapsed.isFinite, elapsed >= 0 else { return LyricVocalFrame(entries: [], elapsed: 0) }
+        // Crossing the track's end also changes active secondary lanes.
+        let bucket = elapsed >= duration ? -1 : timeline.displayBucket(at: elapsed)
+        if let cachedFrame, cachedFrame.bucket == bucket, cachedFrame.duration == duration {
+            return cachedFrame.frame
+        }
+        let frame = LyricVocalFrame(entries: timeline.displayed(at: elapsed, duration: duration), elapsed: elapsed)
+        cachedFrame = (bucket, duration, frame)
+        return frame
+    }
+
+    var hasWordTimings: Bool { timeline.hasWordTimings }
+
+    /// Line-only lyrics wake at vocal boundaries, including simultaneous lanes.
+    func displayDates(anchorPosition: Double, anchorDate: Date, rate: Double, playing: Bool) -> [Date] {
+        guard playing, rate > 0 else { return [.now] }
+        let now = Date()
+        return [now] + timeline.displayBoundaries.map {
+            anchorDate.addingTimeInterval(($0 - anchorPosition) / rate)
+        }.filter { $0 > now }
     }
 
     /// Constant within a track so controls don't jump during backing vocals.

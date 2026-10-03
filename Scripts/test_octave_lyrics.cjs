@@ -3,10 +3,13 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 // Exercise the shipped parser in its browser environment, with no network.
+let sampleTime = 25.125;
+const heartbeats = [];
+const audioListeners = new Map();
 const window = {addEventListener() {}, postMessage() {}};
 const context = vm.createContext({window, navigator: {mediaSession: {setActionHandler() {}}},
   MediaSession: class {}, location: {origin: 'https://music.octavestreaming.com'},
-  queueMicrotask, AbortController, performance: {timeOrigin: 1000000, now: () => 25.125}, fetch: async () => ({}), console});
+  queueMicrotask, setInterval(fn) {heartbeats.push(fn);}, AbortController, performance: {timeOrigin: 1000000, now: () => sampleTime}, fetch: async () => ({}), console});
 const source = fs.readFileSync('octave-brave-extension/page.js', 'utf8');
 vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.parseLyrics = parseLyrics;globalThis.requestLyrics = requestLyrics;})();'), context);
 const lyricRequests = [];
@@ -40,7 +43,7 @@ const samples = [];
 window.postMessage = message => samples.push(message);
 context.navigator.mediaSession.metadata = {title: 'Timing fixture', artist: 'Artist'};
 window.__octaveEngine = {active: {currentTime: 10.125, duration: 100, paused: false,
-  playbackRate: 1, volume: 1, addEventListener() {}, removeEventListener() {}}};
+  playbackRate: 1, volume: 1, readyState: 4, addEventListener(name, fn) {audioListeners.set(name, fn);}, removeEventListener(name) {audioListeners.delete(name);}}};
 
 // Restarting the native app replays exact lyrics for the current tab/track.
 let listener, disconnect, reconnect;
@@ -69,5 +72,39 @@ setImmediate(() => {
   const sample = samples.find(message => message.type === 'state');
   assert.equal(sample.sampledAt, 1000025.125);
   assert.equal(sample.position, 10.125);
+  // Ninety browser timeupdate events should produce just four heartbeat
+  // anchors, rather than ninety XPC/SwiftUI publications.
+  samples.length = 0;
+  for (let i = 1; i <= 90; i++) {
+    sampleTime += 250;
+    window.__octaveEngine.active.currentTime += 0.25;
+    audioListeners.get('timeupdate')({type: 'timeupdate'});
+  }
+  assert.equal(samples.filter(m => m.type === 'state').length, 4);
+  samples.length = 0;
+  window.__octaveEngine.active.paused = true;
+  audioListeners.get('pause')({type: 'pause'});
+  assert.equal(samples.at(-1).playing, false);
+  assert.equal(samples.at(-1).clockDiscontinuity, true);
+  samples.length = 0;
+  sampleTime += 6000;
+  heartbeats[0]();
+  assert.equal(samples.length, 0, 'Paused playback needs no heartbeat');
+  window.__octaveEngine.active.currentTime -= 0.025;
+  audioListeners.get('seeked')({type: 'seeked'});
+  assert.equal(samples.at(-1).position, window.__octaveEngine.active.currentTime);
+  assert.equal(samples.at(-1).clockDiscontinuity, true, 'Even small seeks rebase immediately');
+  window.__octaveEngine.active.paused = false;
+  window.__octaveEngine.active.playbackRate = 2;
+  audioListeners.get('ratechange')({type: 'ratechange'});
+  assert.equal(samples.at(-1).rate, 2);
+  audioListeners.get('waiting')({type: 'waiting'});
+  assert.equal(samples.at(-1).rate, 0, 'Freeze the native clock while buffering');
+  audioListeners.get('playing')({type: 'playing'});
+  assert.equal(samples.at(-1).rate, 2);
+  sampleTime += 5000;
+  const previousCount = samples.length;
+  heartbeats[0]();
+  assert.equal(samples.length, previousCount + 1, 'Heartbeat works without timeupdate');
   console.log('Octave parser, overlapping vocals, precise clock and reconnect tests passed');
 });
