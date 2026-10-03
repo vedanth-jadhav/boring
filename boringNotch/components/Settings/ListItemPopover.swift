@@ -10,7 +10,7 @@ import SwiftUI
 struct ListItemPopover<Content: View>: View {
     let content: () -> Content
 
-    @State private var isPresented: Bool = false
+    @ViewState private var isPresented: Bool = false
     var body: some View {
         Button {
             isPresented.toggle()

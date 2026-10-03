@@ -31,10 +31,10 @@ struct CompactHomeView: View {
     let horizontalMediaGestureFeedback: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var lyricContentHeight: CGFloat = 16.5
-    @State private var sliderValue: Double = 0
-    @State private var dragging: Bool = false
-    @State private var lastDragged: Date = .distantPast
+    @ViewState private var lyricContentHeight: CGFloat = 16.5
+    @ViewState private var sliderValue: Double = 0
+    @ViewState private var dragging: Bool = false
+    @ViewState private var lastDragged: Date = .distantPast
 
     @Default(.coloredSpectrogram) private var coloredSpectrogram
     @Default(.musicControlSlots) private var slotConfig
@@ -308,7 +308,7 @@ private struct AudioOutputRowButtonStyle: ButtonStyle {
     let hoverFill: CGFloat
     let pressedFill: CGFloat
 
-    @State private var isHovering = false
+    @ViewState private var isHovering = false
 
     func makeBody(configuration: Configuration) -> some View {
         let fill: CGFloat

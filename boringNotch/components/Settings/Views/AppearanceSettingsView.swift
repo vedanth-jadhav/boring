@@ -12,8 +12,8 @@ struct AppearanceSettingsView: View {
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @Default(.useCustomAccentColor) var useCustomAccentColor
     @Default(.customAccentColorData) var customAccentColorData
-    @State private var customAccentColor: Color = .accentColor
-    @State private var selectedPresetColor: PresetAccentColor?
+    @ViewState private var customAccentColor: Color = .accentColor
+    @ViewState private var selectedPresetColor: PresetAccentColor?
 
     var body: some View {
         Form {

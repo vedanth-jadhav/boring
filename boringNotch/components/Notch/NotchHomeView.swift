@@ -60,7 +60,7 @@ struct AlbumArtView: View {
                 .scaleEffect(x: 1.3, y: 1.4)
                 .rotationEffect(.degrees(92))
                 .blur(radius: 40)
-                .opacity(musicManager.isPlaying ? 0.5 : 0)
+                .opacity(musicManager.isPlaying ? 0.06 : 0)
                 .id(ObjectIdentifier(musicManager.albumArt))
                 .transition(.opacity)
         }
@@ -124,9 +124,9 @@ struct MusicControlsView: View {
     @ObservedObject var musicManager = MusicManager.shared
     @EnvironmentObject var vm: BoringViewModel
     let horizontalMediaGestureFeedback: CGFloat
-    @State private var sliderValue: Double = 0
-    @State private var dragging: Bool = false
-    @State private var lastDragged: Date = .distantPast
+    @ViewState private var sliderValue: Double = 0
+    @ViewState private var dragging: Bool = false
+    @ViewState private var lastDragged: Date = .distantPast
     @Default(.musicControlSlots) private var slotConfig
     @Default(.musicControlSlotLimit) private var slotLimit
     @Default(.showRemainingTime) private var showRemainingTime
@@ -343,10 +343,10 @@ struct FavoriteControlButton: View {
 struct MediaOutputSlotButton: View {
     @EnvironmentObject private var vm: BoringViewModel
     @ObservedObject private var routeManager = AudioRouteManager.shared
-    @State private var showingPicker = false
-    @State private var isHoveringButton = false
-    @State private var isHoveringPopover = false
-    @State private var hideTask: Task<Void, Never>?
+    @ViewState private var showingPicker = false
+    @ViewState private var isHoveringButton = false
+    @ViewState private var isHoveringPopover = false
+    @ViewState private var hideTask: Task<Void, Never>?
 
     var body: some View {
         HoverButton(icon: routeSymbol, scale: .medium) {
@@ -425,10 +425,10 @@ extension Array where Element == MusicControlButton {
 
 struct VolumeControlView: View {
     @ObservedObject var musicManager = MusicManager.shared
-    @State private var volumeSliderValue: Double = 0.5
-    @State private var dragging: Bool = false
-    @State private var showVolumeSlider: Bool = false
-    @State private var lastVolumeUpdateTime: Date = Date.distantPast
+    @ViewState private var volumeSliderValue: Double = 0.5
+    @ViewState private var dragging: Bool = false
+    @ViewState private var showVolumeSlider: Bool = false
+    @ViewState private var lastVolumeUpdateTime: Date = Date.distantPast
     private let volumeUpdateThrottle: TimeInterval = 0.1
 
     var body: some View {

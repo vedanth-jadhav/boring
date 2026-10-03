@@ -2,18 +2,41 @@
 # Swift CLI build, bundle, and stable local signing. No Xcode or Apple account.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source Scripts/toolchain.sh
 configuration="${1:-release}"
-build_jobs="${BORING_BUILD_JOBS:-2}"
+build_jobs="${BORING_BUILD_JOBS:-1}"
+[[ "$build_jobs" =~ ^[1-9][0-9]*$ ]] || toolchain_error "BORING_BUILD_JOBS must be a positive integer."
+# SwiftPM's job limit and the Swift driver's concurrency are separate. Keep
+# each compiler single-threaded, and let foreground apps take priority.
+build_flags=(--jobs "$build_jobs" -Xswiftc -j1 -Xswiftc -num-threads -Xswiftc 1)
+low_priority_swift_build() {
+  # CLT 27's Swift Build engine appends its own CPU-count thread setting after
+  # -Xswiftc flags. SwiftPM's native scheduler honors the explicit job limit.
+  /usr/bin/nice -n 10 /usr/bin/xcrun --sdk macosx swift build --build-system native "${build_flags[@]}" "$@"
+}
+# Swift Build in CLT 27 can stamp the deployment version as the linked SDK.
+# Supply the public linker platform tuple explicitly; the SDK and minimum OS
+# are different inputs. This preserves the existing macOS 14 deployment target.
+sdk_link_flags=(-Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker "$selected_sdk_version")
 app="$PWD/build/Boring Notch Octave.app"
 identity="Boring Notch Octave Local"
 bash Scripts/prepare_spm.sh
-export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
 if ! security find-identity -v -p codesigning | grep -Fq "\"$identity\""; then
   bash Scripts/setup_local_signing.sh
 fi
-swift build -c "$configuration" --jobs "$build_jobs" --skip-update --product boringNotch
-swift build -c "$configuration" --jobs "$build_jobs" --skip-update --product BoringNotchXPCHelper
-binary_dir=$(swift build -c "$configuration" --show-bin-path)
+low_priority_swift_build -v -c "$configuration" --skip-update --sdk "$SDKROOT" "${sdk_link_flags[@]}" --product boringNotch
+low_priority_swift_build -v -c "$configuration" --skip-update --sdk "$SDKROOT" "${sdk_link_flags[@]}" --product BoringNotchXPCHelper
+binary_dir=$(apple_swift build --build-system native -c "$configuration" --show-bin-path)
+for binary in boringNotch BoringNotchXPCHelper; do
+  /usr/bin/xcrun otool -l "$binary_dir/$binary" | python3 -c '
+import re, sys
+text = sys.stdin.read()
+match = re.search(r"cmd LC_BUILD_VERSION\s+cmdsize \d+\s+platform \d+\s+minos [\d.]+\s+sdk ([\d.]+)", text)
+if not match or match.group(1) != sys.argv[1]:
+    sys.exit("SDK verification failed: linked binary does not record selected macOS " + sys.argv[1] + " SDK")
+print("Verified linked SDK:", match.group(1))
+' "$selected_sdk_version"
+done
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" \
   "$app/Contents/Frameworks" "$app/Contents/PrivateFrameworks" \
@@ -93,6 +116,9 @@ for bundle in "$binary_dir"/*.bundle; do
   if [[ -d "$bundle" ]]; then cp -R "$bundle" "$app/Contents/Resources/"; fi
 done
 install_name_tool -add_rpath '@executable_path/../Frameworks' "$app/Contents/MacOS/boringNotch" 2>/dev/null || true
+# Native SwiftPM preserves read-only checkout resource permissions on copy.
+# Make only staged bundle resources writable before stripping attributes.
+chmod -R u+w "$app/Contents/Resources"
 xattr -cr "$app"
 find "$app" -name '._*' -delete
 find "$app/Contents/Frameworks" "$app/Contents/PrivateFrameworks" -name '*.framework' -maxdepth 1 -print0 | while IFS= read -r -d '' framework; do

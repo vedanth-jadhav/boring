@@ -14,7 +14,7 @@ public struct DraggableProgressBar: View {
     public var accentColor: Color?
     public var compact: Bool = false
 
-    @State private var isDragging = false
+    @ViewState private var isDragging = false
 
     public init(value: Binding<CGFloat>, onChange: ((CGFloat) -> Void)? = nil, accentColor: Color? = nil, compact: Bool = false) {
         self._value = value

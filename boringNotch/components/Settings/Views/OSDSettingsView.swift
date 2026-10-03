@@ -16,8 +16,8 @@ struct OSDSettings: View {
     @Default(.optionKeyAction) private var optionKeyActionDefault
     @Default(.osdBrightnessSource) private var osdBrightnessSourceDefault
     @Default(.osdVolumeSource) private var osdVolumeSourceDefault
-    @State private var isAccessibilityAuthorized = true
-    @State private var menuBarBrightnessSupported = true
+    @ViewState private var isAccessibilityAuthorized = true
+    @ViewState private var menuBarBrightnessSupported = true
     @ObservedObject private var xpcClient = XPCHelperClient.shared
 
     var body: some View {

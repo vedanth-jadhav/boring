@@ -66,8 +66,8 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
 }
 
 struct SettingsView: View {
-    @State private var selectedTab: SettingsTab = .general
-    @State private var accentColorUpdateTrigger = UUID()
+    @ViewState private var selectedTab: SettingsTab = .general
+    @ViewState private var accentColorUpdateTrigger = UUID()
 
     let updaterController: SPUStandardUpdaterController?
     let camera: CameraModel

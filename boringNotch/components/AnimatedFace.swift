@@ -7,8 +7,8 @@
 import SwiftUI
 
 struct AnimatedFace: View {
-    @State private var isBlinking = false
-    @State private var blinkTask: Task<Void, Never>?
+    @ViewState private var isBlinking = false
+    @ViewState private var blinkTask: Task<Void, Never>?
     var height: CGFloat = 24
     var width: CGFloat = 30
 

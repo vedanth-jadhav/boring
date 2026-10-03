@@ -15,7 +15,7 @@ struct HoverButton: View {
     var action: () -> Void
     var contentTransition: ContentTransition = .symbolEffect
 
-    @State private var isHovering = false
+    @ViewState private var isHovering = false
 
     var body: some View {
         let size = CGFloat(scale == .large ? 40 : 30)

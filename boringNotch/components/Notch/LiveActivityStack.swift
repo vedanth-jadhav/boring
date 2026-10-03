@@ -44,8 +44,8 @@ struct LiveActivityStack<Content: View>: View {
     @Binding var index: Int
     @ViewBuilder let content: (LiveActivityItem) -> Content
 
-    @State private var dragOffset: CGFloat = 0
-    @State private var haptics: Bool = false
+    @ViewState private var dragOffset: CGFloat = 0
+    @ViewState private var haptics: Bool = false
 
     private var clampedIndex: Int { min(max(index, 0), max(items.count - 1, 0)) }
 

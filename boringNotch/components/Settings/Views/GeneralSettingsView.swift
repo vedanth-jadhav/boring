@@ -10,11 +10,11 @@ import LaunchAtLogin
 import SwiftUI
 
 struct GeneralSettings: View {
-    @State private var screens: [(uuid: String, name: String)] = NSScreen.screens.compactMap { screen in
+    @ViewState private var screens: [(uuid: String, name: String)] = NSScreen.screens.compactMap { screen in
         guard let uuid = screen.displayUUID else { return nil }
         return (uuid, screen.localizedName)
     }
-    @State private var showLanguageRestartAlert = false
+    @ViewState private var showLanguageRestartAlert = false
     @ObservedObject var coordinator = BoringViewCoordinator.shared
 
     @Default(.appLanguage) var appLanguage

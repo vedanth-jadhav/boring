@@ -15,9 +15,9 @@ struct FileShareView: View {
     @StateObject private var quickShare = QuickShareService.shared
     @Default(.quickShareProvider) var quickShareProvider: String
 
-    @State private var hostView: NSView?
-    @State private var interactionNonce: UUID = .init()
-    @State private var isProcessing = false
+    @ViewState private var hostView: NSView?
+    @ViewState private var interactionNonce: UUID = .init()
+    @ViewState private var isProcessing = false
 
     private var selectedProvider: QuickShareProvider {
         quickShare.availableProviders.first(where: { $0.id == quickShareProvider }) ?? .systemShareMenu

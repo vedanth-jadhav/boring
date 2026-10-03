@@ -31,9 +31,9 @@ struct MarqueeText: View {
     let frameWidth: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var animate = false
-    @State private var textSize: CGSize = .zero
-    @State private var offset: CGFloat = 0
+    @ViewState private var animate = false
+    @ViewState private var textSize: CGSize = .zero
+    @ViewState private var offset: CGFloat = 0
 
     init(_ text: String, font: Font = .body, nsFont: NSFont.TextStyle = .body, color: Color = .primary, delayDuration: Double = 3.0, frameWidth: CGFloat) {
         self.text = text
@@ -109,9 +109,9 @@ struct TimedLyricText: View {
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var textSize: CGSize = .zero
-    @State private var offset: CGFloat = 0
-    @State private var animationToken = UUID()
+    @ViewState private var textSize: CGSize = .zero
+    @ViewState private var offset: CGFloat = 0
+    @ViewState private var animationToken = UUID()
 
     init(
         _ text: String,

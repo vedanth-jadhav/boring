@@ -12,6 +12,12 @@ import SwiftUI
 // MARK: - Standardized Animations
 /// Centralized animation definitions for consistent UI behavior across the app.
 enum StandardAnimations {
+    /// Content arrives after the expanding surface starts making space.
+    static var contentSettle: Animation {
+        guard Defaults[.enableOpeningAnimation] else { return .linear(duration: 0) }
+        let speed = Defaults[.animationSpeedMultiplier]
+        return .easeOut(duration: 0.20 / speed).delay(0.08 / speed)
+    }
     /// Interactive spring for responsive UI (used for notch interactions)
     static let interactive = Animation.interactiveSpring(response: 0.38, dampingFraction: 0.8, blendDuration: 0)
 

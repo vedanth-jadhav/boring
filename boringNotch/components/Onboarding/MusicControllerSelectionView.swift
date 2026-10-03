@@ -12,7 +12,7 @@ struct MusicControllerSelectionView: View {
     let onContinue: () -> Void
 
     @ObservedObject private var musicManager = MusicManager.shared
-    @State private var selectedMediaController = MusicManager.shared.preferredMediaController
+    @ViewState private var selectedMediaController = MusicManager.shared.preferredMediaController
 
     var body: some View {
         VStack(spacing: 20) {

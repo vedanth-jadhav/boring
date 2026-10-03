@@ -23,17 +23,17 @@ struct ContentView: View {
     @ObservedObject var volumeManager = VolumeManager.shared
     @ObservedObject var notificationManager = SystemNotificationManager.shared
     /// Which entry of the closed-notch activity stack is on top.
-    @State private var activityIndex: Int = 0
-    @State private var hoverTask: Task<Void, Never>?
-    @State private var isHovering: Bool = false
-    @State private var anyDropDebounceTask: Task<Void, Never>?
+    @ViewState private var activityIndex: Int = 0
+    @ViewState private var hoverTask: Task<Void, Never>?
+    @ViewState private var isHovering: Bool = false
+    @ViewState private var anyDropDebounceTask: Task<Void, Never>?
 
-    @State private var gestureProgress: CGFloat = .zero
-    @State private var horizontalMediaGestureTriggered = false
-    @State private var horizontalMediaGestureFeedback: CGFloat = .zero
-    @State private var isHoveringMusicArea = false
+    @ViewState private var gestureProgress: CGFloat = .zero
+    @ViewState private var horizontalMediaGestureTriggered = false
+    @ViewState private var horizontalMediaGestureFeedback: CGFloat = .zero
+    @ViewState private var isHoveringMusicArea = false
 
-    @State private var haptics: Bool = false
+    @ViewState private var haptics: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace var albumArtNamespace
@@ -249,21 +249,21 @@ struct ContentView: View {
 
         // Calculate scale based on gesture progress only
         let gestureScale: CGFloat = {
-            guard gestureProgress != 0 else { return 1.0 }
+            guard !reduceMotion, gestureProgress != 0 else { return 1.0 }
             let scaleFactor = 1.0 + gestureProgress * 0.01
             return max(0.6, scaleFactor)
         }()
 
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
-                let mainLayout = NotchLayout()
-                    .frame(alignment: .top)
-                    .padding(
-                        .horizontal,
-                        vm.notchState == .open ? openedInsets.top : cornerRadiusInsets.closed.bottom
-                    )
-                    .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-                    .background(.black)
+                let mainLayout = LiquidGlassSurface(shape: currentNotchShape, expanded: vm.notchState == .open) {
+                    NotchLayout()
+                        .environmentObject(vm)
+                        .environment(\.colorScheme, .dark)
+                        .frame(alignment: .top)
+                        .padding(.horizontal, vm.notchState == .open ? 12 : max(0, cornerRadiusInsets.closed.bottom - topCornerRadius))
+                        .padding(.bottom, vm.notchState == .open ? 12 : 0)
+                }
                     .clipShape(currentNotchShape)
                           .overlay(alignment: .top) {
                               displayClosedNotchHeight.isZero && vm.notchState == .closed ? nil
@@ -274,7 +274,7 @@ struct ContentView: View {
                     }
                     .shadow(
                         color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
-                            ? .black.opacity(0.7) : .clear, radius: 6
+                            ? .black.opacity(0.28) : .clear, radius: 8, y: 3
                     )
                     // Removed conditional bottom padding when using custom 0 notch to keep layout stable
                     .opacity((isNotchHeightZero && vm.notchState == .closed) ? 0.01 : 1)
@@ -290,14 +290,14 @@ struct ContentView: View {
                     .frame(height: vm.notchState == .open ? openNotchHeight : nil, alignment: .top)
                     .conditionalModifier(true) { view in
                         return view
-                            .animation(vm.notchState == .open ? StandardAnimations.open : StandardAnimations.close, value: vm.notchState)
-                            .animation(.smooth, value: gestureProgress)
+                            .animation(reduceMotion ? nil : (vm.notchState == .open ? StandardAnimations.open : StandardAnimations.close), value: vm.notchState)
+                            .animation(reduceMotion ? nil : .smooth, value: gestureProgress)
                             // Outermost on purpose: it only fires when the
                             // closed-state content changes (the key is stable
                             // across open/close), and when several keys change
                             // at once the innermost animation wins, so the
                             // open/close springs below keep precedence.
-                            .animation(.smooth(duration: 0.3), value: closedNotchContent)
+                            .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: closedNotchContent)
                     }
                     .contentShape(Rectangle())
                     .onHover { hovering in
@@ -371,15 +371,13 @@ struct ContentView: View {
         .padding(.bottom, 8)
         .frame(maxWidth: windowSize.width, maxHeight: windowSize.height, alignment: .top)
         .ignoresSafeArea(.all)
-        .compositingGroup()
         .scaleEffect(
             x: gestureScale,
             y: gestureScale,
             anchor: .top
         )
-        .animation(.smooth, value: gestureProgress)
+        .animation(reduceMotion ? nil : .smooth, value: gestureProgress)
         .background(dragDetector)
-        .preferredColorScheme(.dark)
         .environmentObject(vm)
         .onChange(of: dropInteraction.anyDropZoneTargeting) { _, isTargeted in
             anyDropDebounceTask?.cancel()
@@ -582,9 +580,8 @@ struct ContentView: View {
                     }
                 }
                 .transition(
-                    .scale(scale: 0.8, anchor: .top)
-                    .combined(with: .opacity)
-                    .animation(.smooth(duration: 0.35))
+                    .opacity
+                    .animation(reduceMotion ? nil : StandardAnimations.contentSettle)
                 )
                 .zIndex(1)
                 .allowsHitTesting(vm.notchState == .open)

@@ -39,8 +39,8 @@ struct UpdaterSettingsView: View {
     private let updater: SPUUpdater
 
     @Default(.updateChannel) private var updateChannel
-    @State private var automaticallyChecksForUpdates: Bool
-    @State private var automaticallyDownloadsUpdates: Bool
+    @ViewState private var automaticallyChecksForUpdates: Bool
+    @ViewState private var automaticallyDownloadsUpdates: Bool
 
     init(updater: SPUUpdater) {
         self.updater = updater

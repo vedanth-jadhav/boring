@@ -168,7 +168,7 @@ private struct ShelfBackgroundInteractionView: NSViewRepresentable {
 }
 
 private struct ShelfQuickLookHost<Content: View>: View {
-    @State private var service = QuickLookService()
+    @ViewState private var service = QuickLookService()
     @ViewBuilder let content: (QuickLookService) -> Content
 
     var body: some View {

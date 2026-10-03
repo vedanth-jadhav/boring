@@ -96,7 +96,7 @@ struct GlowingSnake<
 }
 
 struct HelloAnimation: View {
-    @State private var progress: Double = 0.0
+    @ViewState private var progress: Double = 0.0
 
     var onFinish: () -> Void
 

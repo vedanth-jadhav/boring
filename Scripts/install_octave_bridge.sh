@@ -1,13 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-app="$HOME/Applications/Boring Notch Octave.app"
+app="/Applications/Boring Notch Octave.app"
 source_app="$PWD/build/Boring Notch Octave.app"
 if [[ ! -d "$source_app" ]]; then echo "Package the app first." >&2; exit 1; fi
-mkdir -p "$HOME/Applications" \
+mkdir -p "/Applications" \
   "$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts" \
   "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
-staging=$(mktemp -d "$HOME/Applications/.boring-octave.XXXXXX")
+staging=$(mktemp -d "/Applications/.boring-octave.XXXXXX")
 trap 'rm -rf "$staging"' EXIT
 ditto "$source_app" "$staging/Boring Notch Octave.app"
 codesign --verify --deep --strict "$staging/Boring Notch Octave.app"

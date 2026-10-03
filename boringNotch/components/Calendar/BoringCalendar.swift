@@ -22,12 +22,12 @@ struct Config: Equatable {
 struct WheelPicker: View {
     @EnvironmentObject var vm: BoringViewModel
     @Binding var selectedDate: Date
-    @State private var scrollPosition: Int?
-    @State private var haptics: Bool = false
-    @State private var byClick: Bool = false
-    @State private var scrollAccumulator: CGFloat = 0
-    @State private var isHovering: Bool = false
-    @State private var scrollMonitor: Any?
+    @ViewState private var scrollPosition: Int?
+    @ViewState private var haptics: Bool = false
+    @ViewState private var byClick: Bool = false
+    @ViewState private var scrollAccumulator: CGFloat = 0
+    @ViewState private var isHovering: Bool = false
+    @ViewState private var scrollMonitor: Any?
     let config: Config
 
     private let scrollThreshold: CGFloat = 2.0
@@ -244,12 +244,12 @@ struct WheelPicker: View {
 struct WeekStripPicker: View {
     @Binding var selectedDate: Date
     @Default(.weekStartDay) private var weekStartDay
-    @State private var displayedWeekStart: Date = Date()
-    @State private var slideForward: Bool = true
-    @State private var haptics: Bool = false
-    @State private var scrollAccumulator: CGFloat = 0
-    @State private var isHovering: Bool = false
-    @State private var scrollMonitor: Any?
+    @ViewState private var displayedWeekStart: Date = Date()
+    @ViewState private var slideForward: Bool = true
+    @ViewState private var haptics: Bool = false
+    @ViewState private var scrollAccumulator: CGFloat = 0
+    @ViewState private var isHovering: Bool = false
+    @ViewState private var scrollMonitor: Any?
     @Namespace private var selectionNamespace
 
     private let scrollThreshold: CGFloat = 2.0
@@ -467,7 +467,7 @@ struct WeekStripPicker: View {
 struct CalendarView: View {
     @EnvironmentObject var vm: BoringViewModel
     @ObservedObject private var calendarManager = CalendarManager.shared
-    @State private var selectedDate = Date()
+    @ViewState private var selectedDate = Date()
     @Default(.calendarWeekView) private var calendarWeekView
 
     var body: some View {
@@ -585,7 +585,7 @@ struct EventListView: View {
     let events: [EventModel]
     @Default(.autoScrollToNextEvent) private var autoScrollToNextEvent
     @Default(.showFullEventTitles) private var showFullEventTitles
-    @State private var hoveredEventID: String?
+    @ViewState private var hoveredEventID: String?
 
     static func filteredEvents(events: [EventModel]) -> [EventModel] {
         events.filter { event in

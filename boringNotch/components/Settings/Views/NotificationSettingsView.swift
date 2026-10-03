@@ -17,7 +17,7 @@ struct NotificationSettingsView: View {
     @Default(.notificationLiveActivity) private var notificationLiveActivity
     @Default(.notificationsFromAllApps) private var notificationsFromAllApps
     @Default(.notificationAllowedApps) private var allowedApps
-    @State private var isAccessibilityAuthorized = true
+    @ViewState private var isAccessibilityAuthorized = true
 
     private var selectedApps: [NotificationApp] {
         allowedApps

@@ -62,9 +62,6 @@ class BoringNotchSkyLightWindow: NSPanel {
         hasShadow = false
         isReleasedWhenClosed = false
 
-        // Force dark appearance regardless of system setting
-        appearance = NSAppearance(named: .darkAqua)
-
         updateCollectionBehavior()
 
         // Apply initial sharing type setting

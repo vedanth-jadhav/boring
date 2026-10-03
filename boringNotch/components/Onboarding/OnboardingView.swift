@@ -25,7 +25,7 @@ enum OnboardingStep {
 private let calendarService = CalendarService()
 
 struct OnboardingView: View {
-    @State var step: OnboardingStep = .welcome
+    @ViewState var step: OnboardingStep = .welcome
     let updater: SPUUpdater?
     let onFinish: () -> Void
     let onOpenSettings: () -> Void
@@ -214,8 +214,8 @@ struct SoftwareUpdatePermissionView: View {
     let updater: SPUUpdater?
     let onContinue: () -> Void
 
-    @State private var automaticallyChecksForUpdates = true
-    @State private var automaticallyDownloadsUpdates = false
+    @ViewState private var automaticallyChecksForUpdates = true
+    @ViewState private var automaticallyDownloadsUpdates = false
 
     var body: some View {
         VStack(spacing: 24) {

@@ -27,8 +27,8 @@ struct NotificationLiveActivity: View {
     @EnvironmentObject private var vm: BoringViewModel
     let notification: SystemNotification
 
-    @State private var ringScale: CGFloat = 1
-    @State private var ringOpacity = 0.0
+    @ViewState private var ringScale: CGFloat = 1
+    @ViewState private var ringOpacity = 0.0
 
     private var itemSize: CGFloat {
         max(0, vm.effectiveClosedNotchHeight - 12)

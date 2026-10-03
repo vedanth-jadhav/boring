@@ -10,7 +10,9 @@ This local build uses a separate app identifier and has no Sparkle updater feed.
 
 ## Build from source
 
-Requires macOS 14 or later and the Swift toolchain. Build and package with:
+Requires Apple Command Line Tools for Xcode 27 with the macOS 27.x SDK and Apple
+Swift 6.4. The app's deployment target remains macOS 14; native notch glass is
+available on macOS 27, with a solid background on older systems. Build and package with:
 
 ```sh
 bash Scripts/package_local.sh release

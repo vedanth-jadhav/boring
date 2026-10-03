@@ -6,9 +6,23 @@ This build is for macOS and Octave in Brave Browser. It uses a separate app ID,
 ## Build and install
 
 The macOS Command Line Tools are sufficient. No Xcode or Apple Developer account
-is needed. The packaging script uses the installed macOS 26.5 SDK because the
-macOS 27 Command Line Tools do not ship the SwiftUI macro plugins needed by this
-project. It creates a stable, trusted local code signing identity the first
+is needed. Use Command Line Tools for Xcode 27, including the macOS 27.x SDK
+and Apple Swift 6.4. The scripts invoke `/usr/bin/xcrun`, resolve the canonical
+selected SDK path, and reject older SDKs or conflicting environment overrides.
+Verbose builds print the actual compiler command (`-sdk …/MacOSX27.x.sdk`).
+The linker receives an explicit macOS platform tuple and packaging verifies
+`LC_BUILD_VERSION` records SDK 27.x, independently of the macOS 14 minimum OS.
+The package uses Swift tools version 6.0, Swift 5 language mode, and a macOS 14
+deployment target; these settings do not select the SDK.
+
+Standalone CLT 27 omits `SwiftUIMacros`. `ViewState` explicitly aliases Apple's
+public `SwiftUI.State<Value>` property wrapper to retain this fork's existing
+state semantics without that macro plugin. `prepare_spm.sh` applies the same
+selection to the pinned dependencies and retains its existing public
+EnvironmentKey replacement and removal of development previews. No SDK files
+are modified, and no older SDK is used.
+
+The packaging script creates a stable, trusted local code signing identity the first
 time it runs.
 
 ```sh
@@ -18,9 +32,12 @@ open "$HOME/Applications/Boring Notch Octave.app"
 ```
 
 For faster local development, pass `debug` to `package_local.sh`. Builds reuse
-`.build` and cached dependencies, preserve unchanged helper inputs, and use two
-parallel build jobs by default to limit CPU load. Set `BORING_BUILD_JOBS` to
-change that limit. Rebuilds use
+`.build` and cached dependencies, preserve unchanged helper inputs, and use one
+build job by default to limit CPU load. Swift compiler jobs and threads are
+also limited to one, and builds run at lower scheduling priority (`nice 10`).
+The CLI selects SwiftPM's supported native build engine because CLT 27's
+default Swift Build engine overrides the compiler thread limit.
+Set `BORING_BUILD_JOBS` to deliberately change the package job limit. Rebuilds use
 the same signing identity and bundle ID. The installer places native messaging
 manifests in Brave's directory and the Chrome compatibility directory used by
 some Brave versions.

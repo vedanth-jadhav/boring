@@ -12,8 +12,8 @@ struct ShelfItemView: View {
     let quickLookService: QuickLookService
     let dropInteraction: DropInteractionState
     @StateObject private var viewModel: ShelfItemViewModel
-    @State private var selectionState: ShelfItemSelectionState
-    @State private var debouncedDropTarget = false
+    @ViewState private var selectionState: ShelfItemSelectionState
+    @ViewState private var debouncedDropTarget = false
 
     private var isSelected: Bool { selectionState.isSelected }
 
