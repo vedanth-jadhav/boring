@@ -7,9 +7,9 @@ not establish a measured CPU or battery improvement by themselves.
 
 | Findings | Result |
 | --- | --- |
-| 1 | Exact lyrics sample at up to 30 fps (10 with Reduce Motion). Vocal splitting, identities, short-word counts and activity intervals are prepared with each response. Frames are cached between vocal boundaries; layout keys use row identity, dimensions and romanization. |
-| 2 | Only actively sung words instantiate the shimmer overlay. Other words use static opacity. Fitting/paged lines have no outer fade mask. Word anchors use a prepared binary-search index that preserves source order; page lookup and accessibility text are prepared once. |
-| 3 | LRC rows use static whole-word pages with explicit timestamp scheduling, preserving long-line readability without per-word shimmer. Paused playback has only an immediate schedule entry. |
+| 1 | Row selection uses explicit source-timestamp scheduling, including word starts/ends. Only actively sung text samples at 30 fps; layout, row selection and other words have no continuous lyric render loop. Vocal splitting, identities and activity intervals are prepared with each response. Frames are cached between vocal boundaries; layout keys use row identity, dimensions and romanization. |
+| 2 | The active word uses a monotonic soft white ink sweep, with no underline, attack/release dimming, glyph overlay/mask or geometry reader. Words under 180 ms light fully at onset so fast rap syllables are not lost inside a sweep. Held words stay lit for their whole window; pause/buffering freezes the sweep. Reduce Motion uses steady emphasis. Long lines use static whole-word pages with short crossfades; expanded romanized tokens are measured and fitted on cache miss. |
+| 3 | Hindi/Hinglish/Punjabi/Urdu line-only sources use estimated syllable-weighted word windows within the source line bounds. Exact provider timestamps remain distinct and take priority. Other line-only sources keep the phrase sheen. Paused playback has only an immediate row schedule entry and pauses active-text animation. |
 | 4 | Both slider layouts tick at 250 ms only while playing with positive rate. Direct anchor/state observation preserves paused external seeks and track changes. |
 | 5–6 | Shadow rendering uses only the silhouette, with its interior cut out to preserve transparent glass. The music controls have no compositing group. |
 | 7, 11 | Closed surfaces use `Glass.identity`, which disables the effect while preserving the content tree through open/close. There is one outer notch clip. Appearance → Reduce glass selects the opaque fallback. |
@@ -30,14 +30,14 @@ not establish a measured CPU or battery improvement by themselves.
 ## Automated validation
 
 - `swift build --build-system native --product boringNotch`.
-- `bash Scripts/test_performance.sh`: 36 Swift checks, including the existing
-  lyrics suites, cache invalidation, precise boundaries, playback rate,
+- `bash Scripts/test_performance.sh`: 60 Swift checks, including the existing
+  lyrics suites, cache invalidation, precise boundaries, event scheduling, playback rate,
+  Unicode normalization, broader-script romanization, the Iraaday example,
+  bundled pronunciation indexes and expanded-token fitting,
   downsampling/color, AppKit visibility, consumer lifetime and shell subscriptions;
   also runs browser parser/clock/reconnection/dedup/buffering tests.
 - `bash Scripts/test_focus_session.sh`: production focus state machine and IOPM
   lifecycle checks.
-- `bash Scripts/test_notifications.sh --skip-build`: 13 notification checks,
-  including content rendering, burst queues, application opening and helper behavior.
 - `git diff --check`.
 
 The selected Command Line Tools SDK has no XCTest framework. The CLI runner
@@ -54,3 +54,38 @@ Apple documents the no-effect identity variant at
 [Glass.identity](https://developer.apple.com/documentation/swiftui/glass/identity),
 and the visibility lifecycle at
 [NSWindow.didChangeOcclusionStateNotification](https://developer.apple.com/documentation/appkit/nswindow/didchangeocclusionstatenotification).
+
+## Pronunciation data and rendering
+
+Hindi/Punjabi/Urdu romanization first checks curated spellings, then 88,100
+human-attested entries derived from Dakshina v1.0, then conservative script
+rules. Optional Urdu vowel marks and Arabic letter variants use the same lookup
+key; explicit Punjabi addak still doubles the consonant. Other scripts use
+Foundation's Unicode Latin transform. Existing Latin text stays intact.
+The 2,412,229-byte data set is memory-mapped, binary-searched and loaded only for
+the script needed. Converted strings and measured layouts stay cached outside
+the animation path. Runtime requires no extra process, inference or network.
+
+The actual Iraaday provider response contains LRC line timings (42.58–47.91 s
+for the reported line), rather than exact word alignment. Its phrase now gets
+a text-only sweep, and the Urdu line reads “kaisa samaa hai, hum tum yahaan hain.”
+The UI cannot establish word timing absent from the source. Human romanization
+also varies by context; the table improves lexical coverage rather than
+establishing a measured tenfold pronunciation accuracy increase.
+
+A local optimized CLI benchmark of the real Iraaday response measured 0.826 ms
+for the first full-song conversion (original: 0.362 ms), then 3.183 µs per cached
+lookup over 100,000 calls (original: 3.001 µs). This measures conversion/cache
+work, not whole-application CPU or battery usage. The raw run is saved in
+`build/validation/romanization-benchmark.txt`.
+
+For Majboor and Banda Kaam Ka, Octave currently supplies only LRCLIB line
+timestamps. The Hindi/Hinglish fallback now enables individual word sheen,
+with syllable weights prepared once per response rather than using script
+character counts. Native and romanized display share the same estimated clock.
+English line-only behavior and all exact provider word stamps are preserved.
+The full responses passed 143 and 423 word-window checks respectively, including
+native/romanized page coverage. An optimized CLI sample measured preparation
+at 0.73/3.95 ms and cached page/phase sampling at 0.47/0.68 microseconds per
+sample. These are model/layout measurements, not application CPU or battery
+measurements. Evidence: `build/validation/hinglish-highlight-validation.txt`.

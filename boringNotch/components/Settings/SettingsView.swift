@@ -19,7 +19,6 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case mirror
     case battery
     case osd
-    case notifications
     case shortcuts
     case about
 
@@ -41,7 +40,6 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .mirror: "Mirror"
         case .battery: "Battery"
         case .osd: "OSD"
-        case .notifications: "Notifications"
         case .shortcuts: "Shortcuts"
         case .about: "About"
         }
@@ -58,7 +56,6 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .mirror: .system("video")
         case .battery: .system("battery.100.bolt")
         case .osd: .system("dial.medium.fill")
-        case .notifications: .system("bell.badge")
         case .shortcuts: .system("keyboard")
         case .about: .system("info.circle")
         }
@@ -99,8 +96,6 @@ struct SettingsView: View {
                     AppearanceSettingsView()
                 case .media:
                     MediaSettingsView()
-                case .notifications:
-                    NotificationSettingsView()
                 case .calendar:
                     CalendarSettings()
                 case .osd:

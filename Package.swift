@@ -35,7 +35,7 @@ let package = Package(
                 "mediaremote-adapter", "octave-brave-extension", "updater", ".github", "build",
                 "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", "LICENSE", "README.md",
                 "SECURITY.md", "THIRD_PARTY_LICENSES", "crowdin.yml", "LOCAL_OCTAVE.md", "dist",
-                "boringNotch/Assets.xcassets", "boringNotch/Preview Content",
+                "boringNotch/Assets.xcassets", "boringNotch/Preview Content", "boringNotch/Resources/Romanization",
                 "boringNotch/Localizable.xcstrings", "boringNotch/Info.plist",
                 "boringNotch/boringNotch.entitlements", "boringNotch/boring.m4a",
                 "boringNotch/components/Music/LottieAnimationView.swift"

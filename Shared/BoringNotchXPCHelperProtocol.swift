@@ -51,17 +51,6 @@ final class BNLunarBrightnessEvent: NSObject, NSSecureCoding {
     func startLunarEventStream(with reply: @escaping (Bool) -> Void)
     func stopLunarEventStream()
     func setLunarOSDHidden(_ hide: Bool, with reply: @escaping (Bool) -> Void)
-    #if DEBUG
-    func notificationObservationDiagnostics(with reply: @escaping ([String: String]) -> Void)
-    #endif
-    func startNotificationWatching(with reply: @escaping (Bool) -> Void)
-    func suppressNativeNotification(_ semanticData: Data, with reply: @escaping (Bool) -> Void)
-    func configureNotificationCapture(_ allowed: [String], allApps: Bool, ignored: [String], with reply: @escaping () -> Void)
-    func stopNotificationWatching()
 }
 
-@objc protocol BoringNotchXPCHelperDelegate {
-    func notificationDidAppear(_ payload: [String: String])
-}
-
-@objc protocol BoringNotchXPCAppDelegate: BoringNotchXPCHelperLunarListener, BoringNotchXPCHelperDelegate {}
+@objc protocol BoringNotchXPCAppDelegate: BoringNotchXPCHelperLunarListener {}

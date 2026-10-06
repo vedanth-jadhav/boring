@@ -1,0 +1,36 @@
+{
+  "dataset": "Dakshina v1.0",
+  "license": "CC-BY-SA-4.0",
+  "languages": {
+    "hi": {
+      "entries": 30000,
+      "bytes": 931992,
+      "sha256": "5f42baffc0bf3d1845c9bf0b4fb2656151ab97acb6c06f0455c6f81fc70ac9e9",
+      "inputs": {
+        "hi.translit.sampled.train.tsv": "4b3f872d3363a91f949dfb640acab6a968ed7d2d65829a22af662c3e99ef7803",
+        "hi.translit.sampled.dev.tsv": "62019ba0e046ceffd7211a2797daf2d2970da77586ee056dcecaa34c38392bce",
+        "hi.translit.sampled.test.tsv": "37dccdd2ca18a520267588b472f293ce805a1444a5ca2a99169417da17d9bafd"
+      }
+    },
+    "pa": {
+      "entries": 30000,
+      "bytes": 857712,
+      "sha256": "a6efbef646fbb78098de57eb6061a09d81419a5e05f8b12c21e74817f82da76e",
+      "inputs": {
+        "pa.translit.sampled.train.tsv": "5f169b8a0c4823d4efc45d60afc63c9943418e1ba03dba60e904353ab920e104",
+        "pa.translit.sampled.dev.tsv": "01fa73d8ac9871ca60141b2fd97046d8396d0228e8cfaca79aed8576c3d5b03e",
+        "pa.translit.sampled.test.tsv": "ae0b5543fa7625d15cbc50b82d595c426e67a979ece3ad297bb2d914b52f2482"
+      }
+    },
+    "ur": {
+      "entries": 28100,
+      "bytes": 622525,
+      "sha256": "c73ebce52e5326cbdda4ca3e58cf34a3a8d0122a95c766a240009ac0011402e8",
+      "inputs": {
+        "ur.translit.sampled.train.tsv": "41f4f4109e60813f578a70a75b19189acb907e800a862401b7205f6f4a51e7f2",
+        "ur.translit.sampled.dev.tsv": "5ad67a8f4a2bdecd69c50cdd522880c6b4f5da2e35f5f29930b699bae7eb1f71",
+        "ur.translit.sampled.test.tsv": "c57a804a5f7bf0e51486c0a8258ec41ed62ebc4612aed741e0f3bff47d703fd8"
+      }
+    }
+  }
+}

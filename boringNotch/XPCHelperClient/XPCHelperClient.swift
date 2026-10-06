@@ -44,35 +44,26 @@ final class XPCHelperClient: NSObject, ObservableObject {
     private var connection: NSXPCConnection?
     /// Set by the interruption/invalidation hops, cleared when a fresh
     private var lastKnownAuthorization: Bool?
-    private let notificationDelegate = NotificationXPCDelegate()
+    private let appDelegate = LunarXPCDelegate()
     @MainActor private var activationObserver: (any NSObjectProtocol)?
     private var lunarListener: BoringNotchXPCHelperLunarListener?
 
     // MARK: - Connection Management (Main Actor Isolated)
 
     private func ensureRemoteService() -> RemoteXPCService<BoringNotchXPCHelperProtocol> {
-        // Always reuse a live connection — never tear one down to attach a
-        // listener. The exported object below serves *both* callback
-        // protocols from the moment the connection is created, so there's
-        // nothing to re-negotiate.
-        //
-        // This previously invalidated and rebuilt the connection whenever
-        // Lunar/OSD asked for a listener. The helper captures its callback
-        // proxy once, when notification watching starts; invalidating that
-        // connection left it holding a dead proxy, so banners kept being
-        // captured in the helper and silently never arrived in the app.
+        // Keep one connection and exported callback object for Lunar events.
         if let existing = remoteService {
-            notificationDelegate.lunarListener = lunarListener
+            appDelegate.lunarListener = lunarListener
             helperAvailable = true
             return existing
         }
 
         let conn = NSXPCConnection(serviceName: serviceName)
 
-        // One exported object serves both callback protocols.
-        notificationDelegate.lunarListener = lunarListener
+        // Export the Lunar callback listener.
+        appDelegate.lunarListener = lunarListener
         conn.exportedInterface = makeAppDelegateInterface()
-        conn.exportedObject = notificationDelegate
+        conn.exportedObject = appDelegate
 
         conn.interruptionHandler = { [weak self, weak conn] in
             Task { @MainActor in
@@ -330,7 +321,7 @@ final class XPCHelperClient: NSObject, ObservableObject {
         // Register on the shared exported object too: the connection may
         // already exist (it isn't rebuilt for listeners any more), in
         // which case this is the only path that hooks Lunar events up.
-        notificationDelegate.lunarListener = listener
+        appDelegate.lunarListener = listener
         do {
             let service = ensureRemoteService()
             return try await service.withContinuation { service, continuation in
@@ -371,12 +362,10 @@ final class XPCHelperClient: NSObject, ObservableObject {
     }
 }
 
-// MARK: - Notification Center banners
+// MARK: - Lunar callbacks
 
-/// The app's single exported XPC object. Banner pushes are republished as local
-/// notifications; Lunar events are forwarded to whichever listener the OSD code
-/// registered, since both callbacks share one connection.
-final class NotificationXPCDelegate: NSObject, BoringNotchXPCAppDelegate {
+/// Forward brightness events through the app's exported XPC object.
+final class LunarXPCDelegate: NSObject, BoringNotchXPCAppDelegate {
     /// Written on the MainActor (connection setup, `startLunarEventStream`),
     /// read on the XPC connection's private delivery queue. The lock
     /// synchronizes cross-thread publication; the listener itself is still
@@ -406,71 +395,4 @@ final class NotificationXPCDelegate: NSObject, BoringNotchXPCAppDelegate {
         lunarListener?.lunarStreamDidStop(reason)
     }
 
-    func notificationDidAppear(_ payload: [String: String]) {
-        guard let json = payload["event"], let data = json.data(using: .utf8),
-              let event = try? JSONDecoder().decode(NotificationSourceEvent.self, from: data), event.version == 2 else { return }
-        // Decoding occurs on the XPC delivery queue; SwiftUI receives values.
-        NotificationCenter.default.post(name: .systemNotificationDidAppear, object: event)
-    }
-}
-
-extension XPCHelperClient {
-    nonisolated func startNotificationWatching() async -> Bool {
-        do {
-            let service = await MainActor.run { ensureRemoteService() }
-            return try await service.withContinuation { service, continuation in
-                service.startNotificationWatching { started in
-                    continuation.resume(returning: started)
-                }
-            }
-        } catch {
-            await MainActor.run { self.lastError = .transport(underlying: error) }
-            return false
-        }
-    }
-
-    #if DEBUG
-    nonisolated func notificationObservationDiagnostics() async -> [String: String] {
-        do {
-            let service = await MainActor.run { ensureRemoteService() }
-            return try await service.withContinuation { service, continuation in
-                service.notificationObservationDiagnostics { continuation.resume(returning: $0) }
-            }
-        } catch { return ["error": error.localizedDescription] }
-    }
-    #endif
-    func suppressNativeNotification(_ notification: MirroredNotification) async -> Bool {
-        guard let data = try? JSONEncoder().encode(notification) else { return false }
-        do {
-            let service = ensureRemoteService()
-            return try await service.withContinuation { service, continuation in
-                service.suppressNativeNotification(data) { continuation.resume(returning: $0) }
-            }
-        } catch { return false }
-    }
-    nonisolated func configureNotificationSource(allowed: Set<String>, allApps: Bool, ignored: Set<String>) async {
-        do {
-            let service = await MainActor.run { ensureRemoteService() }
-            let _: Void = try await service.withContinuation { service, continuation in
-                service.configureNotificationCapture(Array(allowed), allApps: allApps, ignored: Array(ignored)) {
-                    continuation.resume(returning: ())
-                }
-            }
-        } catch { await MainActor.run { self.lastError = .transport(underlying: error) } }
-    }
-
-    nonisolated func stopNotificationWatching() {
-        Task {
-            let service = await MainActor.run { ensureRemoteService() }
-            do {
-                try await service.withService { $0.stopNotificationWatching() }
-            } catch {
-                await MainActor.run { self.lastError = .transport(underlying: error) }
-            }
-        }
-    }
-}
-
-extension Notification.Name {
-    static let systemNotificationDidAppear = Notification.Name("systemNotificationDidAppear")
 }

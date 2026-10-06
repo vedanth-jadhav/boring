@@ -183,12 +183,17 @@ final class LyricsService: ObservableObject {
 
     var hasWordTimings: Bool { timeline.hasWordTimings }
 
-    /// Line-only lyrics wake at vocal boundaries, including simultaneous lanes.
-    func displayDates(anchorPosition: Double, anchorDate: Date, rate: Double, playing: Bool) -> [Date] {
+    /// The shared row clock paints words. The song-level view only needs row
+    /// and silence boundaries, unless Reduce Motion disables that local clock.
+    func displayDates(anchorPosition: Double, anchorDate: Date, rate: Double, playing: Bool,
+                      wordBoundaries: Bool = true) -> [Date] {
         guard playing, rate > 0 else { return [.now] }
         let now = Date()
-        return [now] + timeline.displayBoundaries.map {
-            anchorDate.addingTimeInterval(($0 - anchorPosition) / rate)
+        let boundaries = wordBoundaries ? timeline.displayBoundaries : timeline.rowDisplayBoundaries
+        return [now] + boundaries.map {
+            // Date/Double conversion can round just before the source stamp.
+            // One microsecond prevents evaluating the previous word at an end.
+            anchorDate.addingTimeInterval(($0 - anchorPosition) / rate + 0.000001)
         }.filter { $0 > now }
     }
 

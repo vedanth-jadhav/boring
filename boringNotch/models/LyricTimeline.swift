@@ -18,9 +18,11 @@ struct LyricTimeline {
     private let frameBoundaries: [Double]
     private let prefixEnds: [Double]
     private let displayEntries: [Entry]
+    var rowDisplayBoundaries: [Double] { frameBoundaries }
 
     init(lines: [LyricLine]) {
         let identity = UUID().uuidString
+        let usePhoneticTiming = LyricPhoneticTiming.isSupported(in: lines)
         var prepared: [Entry] = []
         var concurrent = false
         var nextStarts = [Double?](repeating: nil, count: lines.count)
@@ -35,18 +37,21 @@ struct LyricTimeline {
             let line = lines[index]
             let next = nextStarts[index]
             let end = line.effectiveEnd(nextStart: next, duration: .greatestFiniteMagnitude)
-            let words = line.resolvedWords(until: end)
+            let words = line.resolvedWords(until: end, usePhoneticTiming: usePhoneticTiming)
             if words.contains(where: \.isBackground) { concurrent = true }
             if let previous = prepared.last, previous.end > line.start { concurrent = true }
             prepared.append(Entry(index: index, line: line, end: end, nextStart: next, words: words,
-                vocalRows: .init(words: words, identity: "\(identity):\(index)", hasExactTiming: !line.words.isEmpty)))
+                vocalRows: .init(words: words, identity: "\(identity):\(index)", hasExactTiming: !line.words.isEmpty,
+                                hasEstimatedTiming: line.words.isEmpty && usePhoneticTiming)))
         }
         entries = prepared
         hasWordTimings = lines.contains { !$0.words.isEmpty }
         frameBoundaries = Array(Set(prepared.flatMap { entry in
-            [entry.line.start, entry.end]
-                + (entry.vocalRows.secondary?.activityIntervals.flatMap { [$0.lowerBound, $0.upperBound] } ?? [])
-                + entry.vocalRows.backing.flatMap { [$0.start, $0.end] }
+            let rows = [entry.vocalRows.primary, entry.vocalRows.secondary].compactMap { $0 } + entry.vocalRows.backing
+            let activity = rows.flatMap { row in
+                row.activityIntervals.flatMap { [$0.lowerBound, $0.upperBound] }
+            }
+            return [entry.line.start, entry.end] + activity
         }.filter { $0.isFinite && $0 >= 0 })).sorted()
         displayBoundaries = Array(Set(prepared.flatMap { entry in
             [entry.line.start, entry.end] + entry.words.flatMap { [$0.start, $0.end] }

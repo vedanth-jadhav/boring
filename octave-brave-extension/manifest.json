@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Boring Notch Octave Bridge",
-  "version": "1.0.0",
-  "description": "Connects the Octave player in Brave to the local Boring Notch app.",
+  "version": "1.2.0",
+  "description": "Connects Octave music, lyrics and playback controls to Boring Notch.",
   "permissions": [
     "nativeMessaging",
     "tabs"

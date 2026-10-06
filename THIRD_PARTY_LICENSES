@@ -632,3 +632,15 @@ TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
    warranty or additional liability or indemnity.
 
 END OF TERMS AND CONDITIONS
+
+-----------------------------------------------------------------------------
+Dakshina-derived romanization lookup data (hi, pa, ur)
+CC BY-SA 4.0 — https://creativecommons.org/licenses/by-sa/4.0/
+Authors: Brian Roark, Lawrence Wolf-Sonkin, Christo Kirov, Sabrina J. Mielke,
+Cibu Johny, Işın Demirşahin, and Keith Hall (Google Research, 2020).
+Source: https://github.com/google-research-datasets/dakshina
+Paper: https://aclanthology.org/2020.lrec-1.294/
+Normalized, merged and compiled into lookup tables. Attribution, modifications,
+reproduction instructions and hashes: Resources/Romanization/README.md and
+manifest.json. This license applies to the derived data, not application code.
+-----------------------------------------------------------------------------

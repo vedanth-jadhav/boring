@@ -713,11 +713,8 @@ final class MusicManager: ObservableObject {
 
     // MARK: - Playback Position Estimation
     func estimatedPlaybackPosition(at date: Date = Date()) -> TimeInterval {
-        guard isPlaying else { return min(elapsedTime, songDuration) }
-
-        let timeDifference = date.timeIntervalSince(timestampDate)
-        let estimated = elapsedTime + (timeDifference * playbackRate)
-        return min(max(0, estimated), songDuration)
+        LyricPlaybackClock.position(anchorPosition: elapsedTime, anchorDate: timestampDate,
+                                    at: date, rate: playbackRate, playing: isPlaying, duration: songDuration)
     }
 
     func calculateAverageColor() {

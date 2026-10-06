@@ -82,8 +82,10 @@ notarization.
 Lyrics are romanised by default for Hindi, Punjabi (Gurmukhi and Shahmukhi),
 and Urdu. Disable **Romanise Hindi, Punjabi and Urdu lyrics** under Media
 controls to read the original script. Octave's rich lyrics retain exact word
-start/end times for the white shimmer. Sources with only line timestamps use
-estimated word timing; untimed lyrics display their first readable line and have no
+start/end times for the white shimmer. Hindi, Hinglish, Punjabi and Urdu sources
+with only line timestamps use a syllable-weighted word shimmer. Its word times
+are approximate and stay within the source line window; other line-only sources
+keep their phrase sheen. Untimed lyrics display their first readable line and have no
 word highlight. Urdu spellings without written vowels may be approximate.
 
 The shimmer follows each source word's audio phase directly, with a soft

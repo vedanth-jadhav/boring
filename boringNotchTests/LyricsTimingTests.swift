@@ -4,7 +4,7 @@ import XCTest
 final class LyricsTimingTests: XCTestCase {
     func testPunjabiAndMixedEnglish() {
         XCTAssertEqual(LyricsRomanizer.romanize("ਪੱਗ ਪੰਜਾਬੀ ਦਿਲ ਤੇਰਾ ਪਿਆਰ ਨਹੀਂ tonight"), "pagg punjabi dil tera pyaar nahi tonight")
-        XCTAssertEqual(LyricsRomanizer.romanize("ਸੁਪਨਾ ਸੋਹਣਾ"), "supnaa sohnaa")
+        XCTAssertEqual(LyricsRomanizer.romanize("ਸੁਪਨਾ ਸੋਹਣਾ"), "supna sohna")
         XCTAssertEqual(LyricsRomanizer.romanize("ਰੱਤਾ"), "rattaa")
     }
 
@@ -13,7 +13,7 @@ final class LyricsTimingTests: XCTestCase {
         XCTAssertEqual(LyricsRomanizer.romanize("تم میرا دل ہے نہیں پیار عشق"), "tum mera dil hai nahi pyaar ishq")
         XCTAssertEqual(LyricsRomanizer.romanize("مینوں تینوں نال پیار"), "mainu tainu naal pyaar")
         XCTAssertEqual(LyricsRomanizer.romanize("Stay with me, tonight!"), "Stay with me, tonight!")
-        XCTAssertEqual(LyricsRomanizer.romanize("گھر"), "ghr")
+        XCTAssertEqual(LyricsRomanizer.romanize("گھر"), "ghar")
     }
 
     func testFractionalRepeatedAndEmptyLRCStamps() {
@@ -55,5 +55,46 @@ final class LyricsTimingTests: XCTestCase {
         XCTAssertEqual(words.last!.end, 8, accuracy: 0.000001)
         XCTAssertEqual(words[0].end, words[1].start)
         XCTAssertTrue(LyricLine(start: 0, end: nil, text: "").resolvedWords(until: 1).isEmpty)
+    }
+
+    func testBroaderScriptsAndAccentedLatinStayReadable() {
+        XCTAssertEqual(LyricsRomanizer.romanize("தமிழ் / తెలుగు / ગુજરાતી / বাংলা"), "tamiḻ / telugu / gujarātī / bānlā")
+        XCTAssertEqual(LyricsRomanizer.romanize("안녕 (Привет)"), "annyeong (Privet)")
+        XCTAssertEqual(LyricsRomanizer.romanize("こんにちは"), "kon'nichiha")
+        let latin = "Beyoncé — déjà vu, cafe\u{301} ❤️ १२३"
+        XCTAssertEqual(LyricsRomanizer.romanize(latin), latin)
+    }
+
+    func testEquivalentUnicodeFormsAndJoinersDoNotChangeSpelling() {
+        XCTAssertEqual(LyricsRomanizer.romanize("क़ ख़ ਖ਼"), "q kh kh")
+        XCTAssertEqual(LyricsRomanizer.romanize("क़ ख़ ਖ਼"), "q kh kh")
+        XCTAssertEqual(LyricsRomanizer.romanize("प्या\u{200D}र"), "pyaar")
+        XCTAssertEqual(LyricsRomanizer.romanize("گھر تمہارا خواب"), "ghar tumhaara khwaab")
+    }
+
+    func testIraadayVowelsAndOptionalUrduMarksAreReadable() {
+        XCTAssertEqual(LyricsRomanizer.romanize("کیسا سماں ہے، ہم تم یہاں ہیں"), "kaisa samaa hai, hum tum yahaan hain")
+        XCTAssertEqual(LyricsRomanizer.romanize("میرے اِرادے"), "mere iraaday")
+        XCTAssertEqual(LyricsRomanizer.romanize("میرے ارادے"), "mere iraaday")
+        XCTAssertEqual(LyricsRomanizer.romanize("زندگي ہے؟"), "zindagi hai?")
+        XCTAssertEqual(LyricsRomanizer.romanize("कैसा समां है हम तुम यहाँ हैं"), "kaisa samaan hai hum tum yahaan hain")
+    }
+
+    func testAttestedSpellingsRecoverMissingVowelsAndMedialSchwa() {
+        XCTAssertEqual(LyricsRomanizer.romanize("جذبات ظاہر حوالے بہانے"), "jazbaat zaahir hawaale bahaane")
+        XCTAssertEqual(LyricsRomanizer.romanize("जीवन अपनी रास्ता धड़कन लम्हे"), "jeevan apni rasta dhadkan lamhe")
+    }
+
+    func testBundledLexiconsHaveCompleteIndexesAndUnknownWordsFallBack() throws {
+        let directory = try XCTUnwrap(ProcessInfo.processInfo.environment["BORING_ROMANIZATION_RESOURCES"].map {
+            URL(fileURLWithPath: $0)
+        } ?? Bundle.main.resourceURL?.appendingPathComponent("Romanization"))
+        for (language, expected) in [("hi", 30000), ("pa", 30000), ("ur", 28100)] {
+            let table = try XCTUnwrap(RomanizationLexicon(url: directory.appendingPathComponent(language + ".lexicon")))
+            XCTAssertEqual(table.count, expected)
+            XCTAssertNil(table.romanization(for: "not a source word"))
+            XCTAssertNil(table.romanization(for: ""))
+        }
+        XCTAssertNil(RomanizationLexicon(url: directory.appendingPathComponent("missing.lexicon")))
     }
 }

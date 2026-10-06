@@ -6,20 +6,24 @@ struct LyricVocalFrame {
         let words: [LyricLine.Word]
         let isBackground: Bool
         let hasExactTiming: Bool
-        let shortWordCount: Int
+        let hasEstimatedTiming: Bool
+        var highlightsWords: Bool { hasExactTiming || hasEstimatedTiming }
         let text: String
         let start: Double
         let end: Double
         let activityIntervals: [Range<Double>]
+        private let shortestWordDuration: Double
         private let anchorStarts: [Double]
         private let anchorIndices: [Int]
 
-        init(id: String, words: [LyricLine.Word], isBackground: Bool, hasExactTiming: Bool) {
+        init(id: String, words: [LyricLine.Word], isBackground: Bool, hasExactTiming: Bool,
+             hasEstimatedTiming: Bool = false) {
             self.id = id
             self.words = words
             self.isBackground = isBackground
             self.hasExactTiming = hasExactTiming
-            shortWordCount = words.reduce(0) { $0 + ($1.end - $1.start < 0.24 ? 1 : 0) }
+            self.hasEstimatedTiming = hasEstimatedTiming
+            shortestWordDuration = words.map { $0.end - $0.start }.filter { $0.isFinite && $0 > 0 }.min() ?? 1
             text = words.map(\.text).joined(separator: " ")
             start = words.map(\.start).min() ?? 0
             end = words.map(\.end).max() ?? 0
@@ -52,6 +56,12 @@ struct LyricVocalFrame {
         func isActive(at elapsed: Double) -> Bool {
             activityIntervals.contains { $0.contains(elapsed) }
         }
+
+        func animationInterval(rate: Double) -> Double {
+            // One display clock for the entire row. Dense vocals need more
+            // samples; a held note or line sheen can use half the frame rate.
+            highlightsWords && shortestWordDuration / max(0.01, rate) < 0.25 ? 1.0 / 60 : 1.0 / 30
+        }
     }
 
     /// Vocal roles and overlap groups depend on the response, not the clock.
@@ -60,7 +70,7 @@ struct LyricVocalFrame {
         let secondary: Row?
         let backing: [Row]
 
-        init(words: [LyricLine.Word], identity: String, hasExactTiming: Bool) {
+        init(words: [LyricLine.Word], identity: String, hasExactTiming: Bool, hasEstimatedTiming: Bool = false) {
             let foreground = words.filter { !$0.isBackground }
             let overlapping = words.indices.filter { index in
                 let word = words[index]
@@ -74,9 +84,9 @@ struct LyricVocalFrame {
             // in later positions it belongs to the concurrent vocal lane.
             let primaryWords = foreground.isEmpty ? words : inline
             primary = primaryWords.isEmpty ? nil : Row(id: "\(identity):lead", words: primaryWords,
-                isBackground: foreground.isEmpty, hasExactTiming: hasExactTiming)
+                isBackground: foreground.isEmpty, hasExactTiming: hasExactTiming, hasEstimatedTiming: hasEstimatedTiming)
             secondary = inline.isEmpty ? nil : Row(id: "\(identity):lead", words: inline,
-                isBackground: foreground.isEmpty, hasExactTiming: hasExactTiming)
+                isBackground: foreground.isEmpty, hasExactTiming: hasExactTiming, hasEstimatedTiming: hasEstimatedTiming)
             var groups: [[Int]] = []
             for index in overlapping {
                 if groups.last?.last == index - 1 {
@@ -85,7 +95,7 @@ struct LyricVocalFrame {
             }
             backing = groups.map { group in
                 Row(id: "\(identity):backing:\(group[0])", words: group.map { words[$0] },
-                    isBackground: true, hasExactTiming: hasExactTiming)
+                    isBackground: true, hasExactTiming: hasExactTiming, hasEstimatedTiming: hasEstimatedTiming)
             }
         }
     }

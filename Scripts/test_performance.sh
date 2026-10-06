@@ -31,12 +31,12 @@ PY
 performance_objects=("$performance_binary_dir/Defaults.build/"*.o)
 /usr/bin/xcrun --sdk macosx swiftc -swift-version 5 -parse-as-library -D BORING_LOCAL_BUILD \
   -I "$performance_binary_dir/Modules" \
-  boringNotch/models/Lyric{Line,Timeline,VocalFrame,WordPhase,PlaybackClock}.swift \
-  boringNotch/models/LyricsRomanizer.swift boringNotch/managers/LyricsService.swift \
+  boringNotch/models/Lyric{Line,Timeline,VocalFrame,WordPhase,PlaybackClock,PhoneticTiming}.swift \
+  boringNotch/models/LyricsRomanizer.swift boringNotch/models/RomanizationLexicon.swift boringNotch/managers/LyricsService.swift \
   boringNotch/MediaControllers/MediaAppBundleID.swift boringNotch/helpers/AppleScriptHelper.swift \
   boringNotch/components/LiveActivities/LyricTextLayout.swift boringNotch/extensions/NSImage+Extensions.swift \
   boringNotch/components/Music/MusicVisualizer.swift boringNotch/components/LiveActivities/NotchMusicState.swift \
   Scripts/PerformanceLifecycleChecks.swift Scripts/PerformanceTestSupport.swift "$performance_test_dir/Tests.swift" \
   "${performance_objects[@]}" -o "$performance_test_dir/checks"
-"$performance_test_dir/checks"
+BORING_ROMANIZATION_RESOURCES="$PWD/boringNotch/Resources/Romanization" "$performance_test_dir/checks"
 node Scripts/test_octave_lyrics.cjs

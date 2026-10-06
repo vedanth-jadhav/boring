@@ -5,8 +5,7 @@ import AppKit
 final class LyricTextLayout {
     let text: [String]
     let widths: [CGFloat]
-    let starts: [CGFloat]
-    let totalWidth: CGFloat
+    let pointSizes: [CGFloat]
     let spacing: CGFloat
     let pages: [Range<Int>]
     let pageForWord: [Range<Int>]
@@ -29,12 +28,25 @@ final class LyricTextLayout {
     private init(words: [LyricLine.Word], romanize: Bool, pointSize: CGFloat, width: CGFloat) {
         text = words.map { romanize ? LyricsRomanizer.romanize($0.text) : $0.text }
         let font = NSFont.systemFont(ofSize: pointSize, weight: .medium)
-        widths = text.map { ($0 as NSString).size(withAttributes: [.font: font]).width }
+        let measured = text.map { ($0 as NSString).size(withAttributes: [.font: font]).width }
+        let available = max(1, width - 4)
+        // Transliteration can expand a source token considerably. Fit a lone
+        // oversized token once, keeping its spelling and original timing intact.
+        let fitted = zip(text, measured).map { token, measure -> (CGFloat, CGFloat) in
+            var size = pointSize
+            var width = measure
+            // System-font optical sizing is not perfectly linear. Re-measure
+            // oversized tokens until the actual glyphs fit, only on cache miss.
+            while width > available, size > 0.01 {
+                size = max(0.01, size * min(0.98, available / width))
+                width = (token as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: size, weight: .medium)]).width
+            }
+            return (size, width)
+        }
+        pointSizes = fitted.map { $0.0 }
+        widths = fitted.map { $0.1 }
         let gap = pointSize * 0.28
         spacing = gap
-        var cursor: CGFloat = 0
-        starts = widths.map { size in defer { cursor += size + gap }; return cursor }
-        totalWidth = max(0, cursor - gap)
         var ranges: [Range<Int>] = []
         var start = 0
         var used: CGFloat = 0

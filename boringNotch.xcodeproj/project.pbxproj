@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F2A1C0000000000000000014 /* LyricPhoneticTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000013 /* LyricPhoneticTiming.swift */; };
+		F2A1C0000000000000000010 /* RomanizationLexicon.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C000000000000000000F /* RomanizationLexicon.swift */; };
+		F2A1C0000000000000000012 /* Romanization in Resources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000011 /* Romanization */; };
 		F0C050000000000000000006 /* CenteredRulerSnapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C050000000000000000005 /* CenteredRulerSnapping.swift */; };
 		F0C050000000000000000004 /* FocusActivityMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C050000000000000000003 /* FocusActivityMetrics.swift */; };
 		F0C050000000000000000002 /* FocusDurationSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C050000000000000000001 /* FocusDurationSelection.swift */; };
@@ -135,11 +138,7 @@
 		A1B2C3D4E5F60718293A4B5D /* NowPlayingStreamSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* NowPlayingStreamSupport.swift */; };
 		A1F000012F00000100000001 /* ShelfItemInteractionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000022F00000100000001 /* ShelfItemInteractionView.swift */; };
 		A7F4A06476BC4B029B6BECEA /* NotchUIEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80E354C7D712441284085CEA /* NotchUIEvent.swift */; };
-		AA01NLA12E7A0001 /* NotificationLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01NLA22E7A0001 /* NotificationLiveActivity.swift */; };
-		AA01SNM12E7A0001 /* SystemNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01SNM22E7A0001 /* SystemNotificationManager.swift */; };
-		AA02CAM12E7A0001 /* ContactAvatarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA02CAM22E7A0001 /* ContactAvatarManager.swift */; };
 		AA03OTP12E7A0001 /* OTPDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA03OTP22E7A0001 /* OTPDetector.swift */; };
-		AA04LAS12E7A0001 /* LiveActivityStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA04LAS22E7A0001 /* LiveActivityStack.swift */; };
 		AA06CHV12E7A0001 /* CompactHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA06CHV22E7A0001 /* CompactHomeView.swift */; };
 		AA07ARM12E7A0001 /* AudioRouteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA07ARM22E7A0001 /* AudioRouteManager.swift */; };
 		AFA82F21304B406590337862 /* ShelfContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = E49B58CAC648403F864E6D78 /* ShelfContextMenu.swift */; };
@@ -210,6 +209,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F2A1C0000000000000000013 /* LyricPhoneticTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricPhoneticTiming.swift; sourceTree = "<group>"; };
+		F2A1C000000000000000000F /* RomanizationLexicon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomanizationLexicon.swift; sourceTree = "<group>"; };
+		F2A1C0000000000000000011 /* Romanization */ = {isa = PBXFileReference; lastKnownFileType = folder; path = boringNotch/Resources/Romanization; sourceTree = SOURCE_ROOT; };
 		F0C050000000000000000005 /* CenteredRulerSnapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/CenteredRulerSnapping.swift; sourceTree = SOURCE_ROOT; };
 		F0C050000000000000000003 /* FocusActivityMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/FocusActivityMetrics.swift; sourceTree = SOURCE_ROOT; };
 		F0C050000000000000000001 /* FocusDurationSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/models/FocusDurationSelection.swift; sourceTree = SOURCE_ROOT; };
@@ -330,11 +332,7 @@
 		A1B2C3D4E5F60718293A4B5C /* NowPlayingStreamSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingStreamSupport.swift; sourceTree = "<group>"; };
 		A1F000022F00000100000001 /* ShelfItemInteractionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfItemInteractionView.swift; sourceTree = "<group>"; };
 		A5167212301F85B40018095A /* boringNotchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = boringNotchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA01NLA22E7A0001 /* NotificationLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationLiveActivity.swift; sourceTree = "<group>"; };
-		AA01SNM22E7A0001 /* SystemNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemNotificationManager.swift; sourceTree = "<group>"; };
-		AA02CAM22E7A0001 /* ContactAvatarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactAvatarManager.swift; sourceTree = "<group>"; };
 		AA03OTP22E7A0001 /* OTPDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPDetector.swift; sourceTree = "<group>"; };
-		AA04LAS22E7A0001 /* LiveActivityStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityStack.swift; sourceTree = "<group>"; };
 		AA06CHV22E7A0001 /* CompactHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactHomeView.swift; sourceTree = "<group>"; };
 		AA07ARM22E7A0001 /* AudioRouteManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRouteManager.swift; sourceTree = "<group>"; };
 		AFAD1670A870402D88BFFE47 /* AudioOutputRouteResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioOutputRouteResolver.swift; sourceTree = "<group>"; };
@@ -374,7 +372,6 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-        ABN000000000000000000001 /* Notifications */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = boringNotch/Notifications; sourceTree = SOURCE_ROOT; };
 		112FB72F2CCF12CC0015238C /* private */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = private; sourceTree = "<group>"; };
 		11DAAB303061BDED00E15887 /* Settings */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Settings; sourceTree = "<group>"; };
 		11DAAB463061BE1600E15887 /* LiveActivities */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = LiveActivities; sourceTree = "<group>"; };
@@ -637,8 +634,6 @@
 				F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */,
 				112FB7342CCF16F70015238C /* NotchSpaceManager.swift */,
 				EAB1C3E8B149445A9E57C6AF /* NotchWindowManager.swift */,
-				AA01SNM22E7A0001 /* SystemNotificationManager.swift */,
-				AA02CAM22E7A0001 /* ContactAvatarManager.swift */,
 				147163992C5D35FF0068B555 /* MusicManager.swift */,
 				AA07ARM22E7A0001 /* AudioRouteManager.swift */,
 				F1F2A0A200000000000000F2 /* AudioCaptureManager.swift */,
@@ -777,6 +772,9 @@
 				F2A1C0000000000000000007 /* LyricPlaybackClock.swift */,
 				F2A1C0000000000000000005 /* LyricWordPhase.swift */,
 				F2A1C0000000000000000003 /* LyricsRomanizer.swift */,
+				F2A1C000000000000000000F /* RomanizationLexicon.swift */,
+				F2A1C0000000000000000013 /* LyricPhoneticTiming.swift */,
+				F2A1C0000000000000000011 /* Romanization */,
 				F2A1C0000000000000000001 /* LyricLine.swift */,
 				11F748812ECB07A400F841DB /* MusicControlButton.swift */,
 				118D1FD02E98FF5F00A2FF63 /* SharingStateManager.swift */,
@@ -797,7 +795,6 @@
 		600E881A3042DEAD00B17BFC /* Recovered References */ = {
 			isa = PBXGroup;
 			children = (
-                ABN000000000000000000001 /* Notifications */,
 				8137A8BA990F4D9CBA56CC7A /* Shared */,
 			);
 			name = "Recovered References";
@@ -847,9 +844,7 @@
 		B186542F2C6F455E000B926A /* Notch */ = {
 			isa = PBXGroup;
 			children = (
-				AA01NLA22E7A0001 /* NotificationLiveActivity.swift */,
 				AA06CHV22E7A0001 /* CompactHomeView.swift */,
-				AA04LAS22E7A0001 /* LiveActivityStack.swift */,
 				1194E8862EA6DDA7009C82D6 /* BoringNotchSkyLightWindow.swift */,
 				1160F8D72DD98230006FBB94 /* NotchShape.swift */,
 				9AB0C6BB2C73C9CB00F7CD30 /* NotchHomeView.swift */,
@@ -907,7 +902,6 @@
 				11F7485A2EC9AABA00F841DB /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-                ABN000000000000000000001 /* Notifications */,
 				112FB72F2CCF12CC0015238C /* private */,
 				11DAAB303061BDED00E15887 /* Settings */,
 				11DAAB463061BE1600E15887 /* LiveActivities */,
@@ -1026,6 +1020,7 @@
 			files = (
 				14CEF41D2C5CAED400855D72 /* Preview Assets.xcassets in Resources */,
 				14CEF41A2C5CAED400855D72 /* Assets.xcassets in Resources */,
+				F2A1C0000000000000000012 /* Romanization in Resources */,
 				112B0EB82E30DD0F00562D6C /* MediaRemoteAdapterTestClient in Resources */,
 				112B0EB92E30DD0F00562D6C /* mediaremote-adapter.pl in Resources */,
 				B17266E12C6532560031BA0D /* Localizable.xcstrings in Resources */,
@@ -1113,6 +1108,8 @@
 				F2A1C0000000000000000008 /* LyricPlaybackClock.swift in Sources */,
 				F2A1C0000000000000000006 /* LyricWordPhase.swift in Sources */,
 				F2A1C0000000000000000004 /* LyricsRomanizer.swift in Sources */,
+				F2A1C0000000000000000010 /* RomanizationLexicon.swift in Sources */,
+				F2A1C0000000000000000014 /* LyricPhoneticTiming.swift in Sources */,
 				F2A1C0000000000000000002 /* LyricLine.swift in Sources */,
 				1113ABC82E80E27000EC13B2 /* ShelfItem.swift in Sources */,
 				1113ABCA2E80E27000EC13B2 /* ShelfSelectionModel.swift in Sources */,
@@ -1123,11 +1120,7 @@
 				1160F8D82DD98230006FBB94 /* NotchShape.swift in Sources */,
 				5917FD112E57891600E87F1C /* MediaKeyInterceptor.swift in Sources */,
 				149E0B9A2C737D40006418B1 /* WebcamView.swift in Sources */,
-				AA01SNM12E7A0001 /* SystemNotificationManager.swift in Sources */,
-				AA01NLA12E7A0001 /* NotificationLiveActivity.swift in Sources */,
 				AA06CHV12E7A0001 /* CompactHomeView.swift in Sources */,
-				AA04LAS12E7A0001 /* LiveActivityStack.swift in Sources */,
-				AA02CAM12E7A0001 /* ContactAvatarManager.swift in Sources */,
 				AA03OTP12E7A0001 /* OTPDetector.swift in Sources */,
 				1471639A2C5D35FF0068B555 /* MusicManager.swift in Sources */,
 				AA07ARM12E7A0001 /* AudioRouteManager.swift in Sources */,
@@ -1436,7 +1429,6 @@
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Controls music playback.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "This app uses the calendar to display your calendar events";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to display a live camera view";
-				INFOPLIST_KEY_NSContactsUsageDescription = "This app matches notification senders to your contacts to show their photo";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2024-2026 The Bored Team. Licensed under GPL-3.0.";
 				INFOPLIST_KEY_NSRemindersUsageDescription = "This app uses Reminders to display your scheduled reminder in the calendar";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1505,7 +1497,6 @@
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Controls music playback.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "This app uses the calendar to display your calendar events";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to display a live camera view";
-				INFOPLIST_KEY_NSContactsUsageDescription = "This app matches notification senders to your contacts to show their photo";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2024-2026 The Bored Team. Licensed under GPL-3.0.";
 				INFOPLIST_KEY_NSRemindersUsageDescription = "This app uses Reminders to display your scheduled reminder in the calendar";
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -19,9 +19,10 @@ low_priority_swift_build() {
 # are different inputs. This preserves the existing macOS 14 deployment target.
 sdk_link_flags=(-Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker "$selected_sdk_version")
 app="$PWD/build/Boring Notch Octave.app"
-identity="Boring Notch Octave Local"
+identity="${BORING_CODESIGN_IDENTITY:-Boring Notch Octave Local}"
+app_version="${BORING_APP_VERSION:-2.8.1-local}"
 bash Scripts/prepare_spm.sh
-if ! security find-identity -v -p codesigning | grep -Fq "\"$identity\""; then
+if [[ "$identity" != "-" ]] && ! security find-identity -v -p codesigning | grep -Fq "\"$identity\""; then
   bash Scripts/setup_local_signing.sh
 fi
 low_priority_swift_build -v -c "$configuration" --skip-update --sdk "$SDKROOT" "${sdk_link_flags[@]}" --product boringNotch
@@ -44,6 +45,7 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" \
 cp "$binary_dir/boringNotch" "$app/Contents/MacOS/boringNotch"
 cp "$binary_dir/BoringNotchXPCHelper" "$app/Contents/XPCServices/BoringNotchXPCHelper.xpc/Contents/MacOS/"
 cp boringNotch/boring.m4a "$app/Contents/Resources/"
+cp -R boringNotch/Resources/Romanization "$app/Contents/Resources/"
 cp mediaremote-adapter/mediaremote-adapter.pl mediaremote-adapter/MediaRemoteAdapterTestClient "$app/Contents/Resources/"
 cp -R mediaremote-adapter/MediaRemoteAdapter.framework "$app/Contents/PrivateFrameworks/"
 cp octave-brave-extension/native_host.py "$app/Contents/Resources/octave-native-host.py"
@@ -81,7 +83,7 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$iconset" -o "$app/Contents/Resources/BoringNotch.icns"
 
-python3 - "$app" <<'PY'
+python3 - "$app" "$app_version" <<'PY'
 import datetime, pathlib, plistlib, sys
 app=pathlib.Path(sys.argv[1]); contents=app/'Contents'
 build_date = datetime.datetime.now(datetime.timezone.utc)
@@ -90,13 +92,12 @@ info={
   'CFBundleName':'Boring Notch Octave','CFBundleDisplayName':'Boring Notch Octave',
   'CFBundleIdentifier':'local.vedanth.boringnotch.octave',
   'CFBundleExecutable':'boringNotch','CFBundlePackageType':'APPL',
-  'CFBundleShortVersionString':'2.8.1-local','CFBundleVersion':build_version,
+  'CFBundleShortVersionString':sys.argv[2],'CFBundleVersion':build_version,
   'BNLocalBuildDate':build_date.isoformat(),
   'LSMinimumSystemVersion':'14.0','LSUIElement':True,
   'CFBundleIconFile':'BoringNotch.icns','NSAppleEventsUsageDescription':'Controls music playback.',
   'NSAudioCaptureUsageDescription':'Displays a waveform for the selected music source.',
   'NSCameraUsageDescription':'Displays the camera in the notch.',
-  'NSContactsUsageDescription':'Matches contacts to notifications.',
   'NSCalendarsUsageDescription':'Displays calendar events.',
   'NSRemindersUsageDescription':'Displays reminders.',
   'SUEnableAutomaticChecks':False,'SUAllowsAutomaticUpdates':False,
@@ -106,9 +107,8 @@ info={
 helper=contents/'XPCServices/BoringNotchXPCHelper.xpc/Contents'
 h={'CFBundleIdentifier':'local.vedanth.boringnotch.octave.BoringNotchXPCHelper',
    'CFBundleExecutable':'BoringNotchXPCHelper','CFBundlePackageType':'XPC!',
-   'CFBundleShortVersionString':'2.8.1-local','CFBundleVersion':build_version,
-   'XPCService':{'ServiceType':'Application'},
-   'NSAppleEventsUsageDescription':'Replies to messages at your request.'}
+   'CFBundleShortVersionString':sys.argv[2],'CFBundleVersion':build_version,
+   'XPCService':{'ServiceType':'Application'}}
 (helper/'Info.plist').write_bytes(plistlib.dumps(h))
 PY
 

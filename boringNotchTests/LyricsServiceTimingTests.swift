@@ -64,7 +64,7 @@ final class LyricsServiceTimingTests: XCTestCase {
         XCTAssertEqual(service.displayDates(anchorPosition: 0, anchorDate: date, rate: 1, playing: false).count, 1)
         XCTAssertEqual(service.displayDates(anchorPosition: 0, anchorDate: date, rate: 0, playing: true).count, 1)
         let dates = service.displayDates(anchorPosition: 0, anchorDate: date, rate: 2, playing: true)
-        XCTAssertEqual(dates[1].timeIntervalSince(date), 5, accuracy: 0.000001)
+        XCTAssertEqual(dates[1].timeIntervalSince(date), 5.000001, accuracy: 0.000001)
         service.clearLyrics()
     }
 
@@ -87,6 +87,64 @@ final class LyricsServiceTimingTests: XCTestCase {
         await service.fetchLyrics(bundleIdentifier: nil, title: title, artist: "Fixture")
         XCTAssertEqual(service.currentLyrics, "First line\nSecond line")
         XCTAssertTrue(service.timedLyrics.isEmpty)
+        service.clearLyrics()
+    }
+
+    func testExactHighlightScheduleIncludesBothEndsAndSkipsSilentFrames() async {
+        let service = LyricsService.shared
+        service.clearLyrics()
+        let title = "Word schedule fixture \(UUID().uuidString)"
+        let words = [LyricLine.Word(text: "one", start: 10.125, end: 10.175),
+                     .init(text: "two", start: 11, end: 11.5)]
+        service.setProviderLyrics([LyricLine(start: 10, end: 12, text: "one two", words: words)], title: title, artist: "Fixture")
+        await service.fetchLyrics(bundleIdentifier: nil, title: title, artist: "Fixture")
+        let anchor = Date()
+        let dates = service.displayDates(anchorPosition: 0, anchorDate: anchor, rate: 2, playing: true)
+        // Initial frame plus line/word boundaries; silence needs no refresh loop.
+        XCTAssertEqual(dates.count, 7)
+        for (date, stamp) in zip(dates.dropFirst(), [10.0, 10.125, 10.175, 11, 11.5, 12]) {
+            let elapsed = date.timeIntervalSince(anchor) * 2
+            XCTAssertTrue(elapsed >= stamp)
+            XCTAssertEqual(elapsed, stamp, accuracy: 0.000003)
+        }
+        let firstEnd = dates[3].timeIntervalSince(anchor) * 2
+        XCTAssertFalse(LyricWordPhase(word: words[0], elapsed: firstEnd).isActive)
+        XCTAssertEqual(service.displayDates(anchorPosition: 10.15, anchorDate: anchor, rate: 2, playing: false).count, 1)
+        service.clearLyrics()
+    }
+
+    func testSharedRowClockAvoidsRebuildingSongViewForEveryRapWord() async {
+        let service = LyricsService.shared
+        service.clearLyrics()
+        let title = "Rapid schedule fixture \(UUID().uuidString)"
+        let words = (0..<20).map { LyricLine.Word(text: "rap", start: 10 + Double($0) * 0.05,
+            end: 10 + Double($0 + 1) * 0.05) }
+        service.setProviderLyrics([LyricLine(start: 10, end: 11, text: words.map(\.text).joined(separator: " "), words: words)],
+            title: title, artist: "Fixture")
+        await service.fetchLyrics(bundleIdentifier: nil, title: title, artist: "Fixture")
+        let anchor = Date()
+        let rowDates = service.displayDates(anchorPosition: 0, anchorDate: anchor, rate: 1, playing: true, wordBoundaries: false)
+        XCTAssertEqual(rowDates.count, 3) // initial, onset, end; one local animation clock
+        XCTAssertEqual(service.displayDates(anchorPosition: 0, anchorDate: anchor, rate: 1, playing: true).count, 22)
+        service.clearLyrics()
+    }
+
+    func testSharedRowScheduleRestartsAfterLeadAndBackingSilence() async {
+        let service = LyricsService.shared
+        service.clearLyrics()
+        let title = "Vocal gap fixture \(UUID().uuidString)"
+        service.setProviderLyrics([LyricLine(start: 10, end: 15, text: "lead (oh yeah) again", words: [
+            .init(text: "lead", start: 10, end: 15),
+            .init(text: "(oh", start: 11, end: 12),
+            .init(text: "yeah)", start: 13, end: 14),
+            .init(text: "again", start: 15, end: 16)
+        ])], title: title, artist: "Fixture")
+        await service.fetchLyrics(bundleIdentifier: nil, title: title, artist: "Fixture")
+        let anchor = Date()
+        let dates = service.displayDates(anchorPosition: 0, anchorDate: anchor, rate: 1, playing: true, wordBoundaries: false)
+        for stamp in [11.0, 12, 13, 14, 16] {
+            XCTAssertTrue(dates.contains { abs($0.timeIntervalSince(anchor) - stamp) < 0.00001 })
+        }
         service.clearLyrics()
     }
 }

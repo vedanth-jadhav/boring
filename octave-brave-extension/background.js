@@ -58,6 +58,7 @@ function selectTab() {
 }
 
 chrome.runtime.onMessage.addListener((message, sender) => {
+
   if (!sender.tab || !sender.tab.url?.startsWith("https://music.octavestreaming.com/")) return;
   if (message.type === "state") {
     lastState.set(sender.tab.id, {...message, observedAt: Date.now()});

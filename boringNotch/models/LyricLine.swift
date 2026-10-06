@@ -15,20 +15,22 @@ struct LyricLine: Equatable {
     var words: [Word] = []
     var isBackground: Bool = false
 
-    func resolvedWords(until fallbackEnd: Double) -> [Word] {
+    func resolvedWords(until fallbackEnd: Double, usePhoneticTiming: Bool = false) -> [Word] {
         if !words.isEmpty { return assigningVocalRoles(to: words) }
         let tokens = text.split(whereSeparator: \.isWhitespace).map(String.init)
         guard !tokens.isEmpty else { return [] }
         let finish = max(start + 0.1, end ?? fallbackEnd)
-        // Line-only sources have no exact word alignment. Weight by syllable
-        // length rather than making a short article last as long as a long word.
-        let weights = tokens.map { Double(max(2, $0.count)) }
+        // South Asian lyrics use spoken syllables, independent of script or
+        // display romanization. Keep the existing paging of other LRC sources.
+        let weights = tokens.map {
+            usePhoneticTiming ? LyricPhoneticTiming.weight(of: $0) : Double(max(2, $0.count))
+        }
         let total = weights.reduce(0, +)
         var cursor = start
-        let estimated = zip(tokens, weights).map { text, weight in
-            let next = cursor + (finish - start) * weight / total
+        let estimated = tokens.indices.map { index in
+            let next = index == tokens.count - 1 ? finish : cursor + (finish - start) * weights[index] / total
             defer { cursor = next }
-            return Word(text: text, start: cursor, end: next)
+            return Word(text: tokens[index], start: cursor, end: next)
         }
         return assigningVocalRoles(to: estimated)
     }

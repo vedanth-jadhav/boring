@@ -12,7 +12,7 @@ SOCKET = os.path.expanduser("~/Library/Application Support/BoringNotchLocal/octa
 def read_exact(stream, length):
     result = bytearray()
     while len(result) < length:
-        chunk = stream.read(length - len(result))
+        chunk = os.read(stream.fileno(), length - len(result))
         if not chunk:
             return None
         result.extend(chunk)

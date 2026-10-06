@@ -92,20 +92,7 @@ final class BoringViewCoordinator: ObservableObject {
     private var osdReplacementCancellable: AnyCancellable?
     private var boringShelfCancellable: AnyCancellable?
     private var osdSourceCancellables: [AnyCancellable] = []
-    /// One policy for every screen; notification state never opens a workspace
-    /// or overrides the battery / brightness / volume HUD.
-    @MainActor func notificationPresentation(for vm: BoringViewModel, dragging: Bool) -> NotificationPresentationPolicy.Mode {
-        NotificationPresentationPolicy.mode(
-            hasNotifications: NotificationManager.shared.isPresented && !NotificationManager.shared.state.notifications.isEmpty,
-            unavailable: NotificationManager.shared.availability == .disabled || NotificationManager.shared.availability == .suspended,
-            hidden: vm.hideOnClosed && vm.notchState == .closed,
-            onboarding: helloAnimationRunning,
-            dragging: dragging,
-            workspaceOpen: vm.notchState == .open,
-            systemHUD: (expandingView.show && expandingView.type == .battery) || shouldShowSneakPeek(on: vm.screenUUID))
-    }
 
-    private var notificationLiveActivityCancellable: AnyCancellable?
     private var uiEventCancellable: AnyCancellable?
 
     private init() {
@@ -141,9 +128,7 @@ final class BoringViewCoordinator: ObservableObject {
                     if Defaults[.osdReplacement] {
                         await MediaKeyInterceptor.shared.start(promptIfNeeded: false)
                     }
-                    if Defaults[.notificationLiveActivity] {
-                        await SystemNotificationManager.shared.start()
-                    }
+
                 } else {
                     MediaKeyInterceptor.shared.stop()
                 }
@@ -205,19 +190,6 @@ final class BoringViewCoordinator: ObservableObject {
                 }
             }
 
-        // Observe changes to the notification live activity toggle; it owns
-        // the notification watcher lifecycle.
-        notificationLiveActivityCancellable = Defaults.publisher(.notificationLiveActivity)
-            .sink { change in
-                Task { @MainActor in
-                    if change.newValue {
-                        await SystemNotificationManager.shared.start()
-                    } else {
-                        SystemNotificationManager.shared.stop()
-                    }
-                }
-            }
-
         Task { @MainActor in
             helloAnimationRunning = firstLaunch
 
@@ -225,9 +197,6 @@ final class BoringViewCoordinator: ObservableObject {
                 await MediaKeyInterceptor.shared.start(promptIfNeeded: false)
             }
 
-            if Defaults[.notificationLiveActivity] {
-                await SystemNotificationManager.shared.start()
-            }
             self.applyOSDSources()
         }
     }

@@ -29,7 +29,6 @@ class BoringNotchXPCHelper: NSObject, BoringNotchXPCHelperProtocol {
     }
 
     deinit {
-        watcher.stop()
         var processToTerminate: Process?
         var taskToCancel: Task<Void, Never>?
         var pipeHandlerToClose: JSONLinesPipeHandler?
@@ -91,33 +90,6 @@ class BoringNotchXPCHelper: NSObject, BoringNotchXPCHelperProtocol {
         waitForAuthorization()
     }
 
-    // MARK: - Notification Center banners
-
-    private let watcher = NotificationWatcher()
-    @objc func startNotificationWatching(with reply: @escaping (Bool) -> Void) {
-        let proxy = connection?.remoteObjectProxyWithErrorHandler { [weak self] _ in self?.watcher.stop() }
-        guard let delegate = proxy as? BoringNotchXPCAppDelegate else { reply(false); return }
-        watcher.start(onEvent: { event in
-            guard let data = try? JSONEncoder().encode(event), let json = String(data: data, encoding: .utf8) else { return }
-            delegate.notificationDidAppear(["event": json])
-        }, completion: reply)
-    }
-
-    #if DEBUG
-    @objc func notificationObservationDiagnostics(with reply: @escaping ([String: String]) -> Void) {
-        watcher.diagnostics(completion: reply)
-    }
-    #endif
-    @objc func stopNotificationWatching() { watcher.stop() }
-
-    @objc func configureNotificationCapture(_ allowed: [String], allApps: Bool, ignored: [String], with reply: @escaping () -> Void) {
-        watcher.configureFilter(bundleIDs: Set(allowed), allApps: allApps, ignored: Set(ignored), completion: reply)
-    }
-    private let bannerSuppressor = NativeNotificationSuppressor()
-    @objc func suppressNativeNotification(_ semanticData: Data, with reply: @escaping (Bool) -> Void) {
-        guard let item = try? JSONDecoder().decode(MirroredNotification.self, from: semanticData) else { reply(false); return }
-        bannerSuppressor.suppress(item, completion: reply)
-    }
     private class KeyboardBrightnessClient {
         private static let keyboardID: UInt64 = 1
         private var clientInstance: NSObject?

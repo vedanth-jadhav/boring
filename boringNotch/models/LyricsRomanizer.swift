@@ -4,7 +4,11 @@ import Foundation
 /// Urdu/Shahmukhi omit short vowels: common words have readable spellings;
 /// unfamiliar words use a conservative transliteration rather than translation.
 enum LyricsRomanizer {
-    private static let cache = NSCache<NSString, NSString>()
+    private static let cache: NSCache<NSString, NSString> = {
+        let cache = NSCache<NSString, NSString>()
+        cache.countLimit = 1500
+        return cache
+    }()
 
     static func romanize(_ text: String) -> String {
         if let cached = cache.object(forKey: text as NSString) { return cached as String }
@@ -16,33 +20,73 @@ enum LyricsRomanizer {
         func flush() {
             guard !run.isEmpty else { return }
             let normalized = run.precomposedStringWithCompatibilityMapping
-            if let common = commonWords[normalized] { result += common }
+            let lookup = lookupKey(normalized, script: script ?? 0)
+            if let common = commonWords[lookup] { result += common }
+            // Punjabi addak explicitly doubles the following consonant. Some
+            // casual attested spellings omit it; retain the encoded distinction.
+            else if script == 2 && lookup.unicodeScalars.contains(where: { $0.value == 0x0A71 }) { result += romanizeIndic(normalized) }
+            else if let attested = RomanizationLexicon.romanization(for: lookup, script: script ?? 0) { result += attested }
             else if script == 1 || script == 2 { result += romanizeIndic(normalized) }
             else if script == 3 { result += romanizeUrdu(normalized) }
-            else { result += run }
+            // Foundation's Unicode transliterator covers scripts outside our
+            // Hindi/Punjabi/Urdu phonetic rules. Keep its distinctions rather
+            // than inventing pronunciations or translating the source text.
+            else if script == 4 { result += normalized.applyingTransform(.toLatin, reverse: false) ?? run }
+            else {
+                result += run.replacingOccurrences(of: "،", with: ",")
+                    .replacingOccurrences(of: "؛", with: ";")
+                    .replacingOccurrences(of: "؟", with: "?")
+                    .replacingOccurrences(of: "۔", with: ".")
+            }
             run = ""
         }
         for scalar in text.unicodeScalars {
             let kind: Int
+            let mark = [.nonspacingMark, .spacingMark, .enclosingMark].contains(scalar.properties.generalCategory)
+            let letterOrMark = scalar.properties.isAlphabetic || mark
             switch scalar.value {
-            case 0x0900...0x097F: kind = scalar.properties.isAlphabetic || scalar.properties.generalCategory == .nonspacingMark ? 1 : 0
-            case 0x0A00...0x0A7F: kind = scalar.properties.isAlphabetic || scalar.properties.generalCategory == .nonspacingMark ? 2 : 0
-            case 0x0600...0x06FF, 0x0750...0x077F, 0xFB50...0xFDFF, 0xFE70...0xFEFF:
-                kind = scalar.properties.isAlphabetic || scalar.properties.generalCategory == .nonspacingMark ? 3 : 0
+            case 0x0900...0x097F: kind = letterOrMark ? 1 : 0
+            case 0x0A00...0x0A7F: kind = letterOrMark ? 2 : 0
+            case 0x0600...0x06FF, 0x0750...0x077F, 0x0870...0x08FF, 0xFB50...0xFDFF, 0xFE70...0xFEFF:
+                kind = letterOrMark ? 3 : 0
             case 0x200C, 0x200D: kind = script ?? 0
-            default: kind = 0
+            default:
+                // Combining accents belong to the preceding script run.
+                // Existing Latin (including accented English) stays verbatim.
+                if mark { kind = script ?? 0 }
+                else if scalar.value > 0x7F, scalar.properties.isAlphabetic,
+                        scalar.properties.name?.contains("LATIN") != true { kind = 4 }
+                else { kind = 0 }
             }
             if script != kind { flush(); script = kind }
             run += String(scalar)
         }
         flush()
-        cache.countLimit = 1500
         cache.setObject(result as NSString, forKey: text as NSString)
         return result
     }
 
+    /// Urdu vowel marks are optional; Indic vowel marks change the word.
+    static func lookupKey(_ text: String, script: Int) -> String {
+        var result = ""
+        for scalar in text.precomposedStringWithCompatibilityMapping.unicodeScalars {
+            if scalar.value == 0x200C || scalar.value == 0x200D { continue }
+            if script == 3 {
+                if scalar.value == 0x0640 || scalar.properties.generalCategory == .nonspacingMark { continue }
+                switch scalar.value {
+                case 0x0643: result += "ک"
+                case 0x064A, 0x0649: result += "ی"
+                case 0x0647: result += "ہ"
+                default: result += String(scalar)
+                }
+            } else { result += String(scalar) }
+        }
+        return result
+    }
+
     private static func romanizeIndic(_ text: String) -> String {
-        let scalars = Array(text.precomposedStringWithCanonicalMapping.unicodeScalars)
+        // Precomposed nukta letters and base+nukta must sound identical.
+        let scalars = Array(text.decomposedStringWithCanonicalMapping.unicodeScalars)
         var result = ""
         var inherentVowel = false
         var doubleNext = false
@@ -116,8 +160,8 @@ enum LyricsRomanizer {
         0x35:"v",0x36:"sh",0x37:"sh",0x38:"s",0x39:"h",0x58:"q",0x59:"kh",0x5A:"g",0x5B:"z",0x5C:"r",0x5D:"rh",0x5E:"f"
     ]
     private static let nuktaConsonants = [0x15:"q",0x16:"kh",0x17:"g",0x1C:"z",0x21:"r",0x22:"rh",0x2B:"f"]
-    private static let vowels = [0x05:"a",0x06:"aa",0x07:"i",0x08:"ee",0x09:"u",0x0A:"oo",0x0B:"ri",0x0F:"e",0x10:"ai",0x13:"o",0x14:"au"]
-    private static let vowelMarks = [0x3E:"aa",0x3F:"i",0x40:"ee",0x41:"u",0x42:"oo",0x43:"ri",0x47:"e",0x48:"ai",0x4B:"o",0x4C:"au"]
+    private static let vowels = [0x05:"a",0x06:"aa",0x07:"i",0x08:"ee",0x09:"u",0x0A:"oo",0x0B:"ri",0x0D:"ae",0x0E:"e",0x0F:"e",0x10:"ai",0x11:"aw",0x12:"o",0x13:"o",0x14:"au"]
+    private static let vowelMarks = [0x3E:"aa",0x3F:"i",0x40:"ee",0x41:"u",0x42:"oo",0x43:"ri",0x45:"ae",0x46:"e",0x47:"e",0x48:"ai",0x49:"aw",0x4A:"o",0x4B:"o",0x4C:"au"]
     private static let urduLetters: [Unicode.Scalar: String] = [
         "ا":"a","آ":"aa","أ":"a","إ":"i","ب":"b","پ":"p","ت":"t","ٹ":"t","ث":"s","ج":"j","چ":"ch","ح":"h","خ":"kh",
         "د":"d","ڈ":"d","ذ":"z","ر":"r","ڑ":"r","ز":"z","ژ":"zh","س":"s","ش":"sh","ص":"s","ض":"z","ط":"t","ظ":"z",
@@ -142,6 +186,12 @@ enum LyricsRomanizer {
         "کی":"ki","کے":"ke","کا":"ka","کو":"ko","سے":"se","اور":"aur","یہ":"yeh","وہ":"woh","ہم":"hum","تو":"tu",
         "توں":"tu","مینوں":"mainu","تینوں":"tainu","نوں":"nu","وچ":"vich","نال":"naal","دا":"da","دی":"di","دے":"de",
         "یار":"yaar","خدا":"khuda","کیا":"kya","کیوں":"kyun","بھی":"bhi","کبھی":"kabhi","تمہیں":"tumhe","مجھے":"mujhe",
-        "رات":"raat","بات":"baat","دن":"din","زندگی":"zindagi","ہو":"ho","ایک":"ek","ہوگا":"hoga","تھا":"tha","تھی":"thi"
+        "رات":"raat","بات":"baat","دن":"din","زندگی":"zindagi","ہو":"ho","ایک":"ek","ہوگا":"hoga","تھا":"tha","تھی":"thi",
+        "گھر":"ghar","تمہارا":"tumhaara","تمہاری":"tumhaari","خواب":"khwaab",
+        "کیسا":"kaisa","کیسے":"kaise","سماں":"samaa","یہاں":"yahaan","وہاں":"wahaan",
+        "ارادے":"iraaday","نگاہیں":"nigahein","گنگناتا":"gungunaata","ویراں":"veeraan",
+        "نہ":"na","رہوں":"rahoon","کروں":"karoon","دیکھوں":"dekhoon","پاس":"paas",
+        "ظاہر":"zaahir","جذبات":"jazbaat","حوالے":"hawaale","بہانے":"bahaane","پکار":"pukaar",
+        "दुनियाँ":"duniya","कैसा":"kaisa","कैसे":"kaise","यहाँ":"yahaan","वहाँ":"wahaan"
     ]
 }

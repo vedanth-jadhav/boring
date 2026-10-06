@@ -20,9 +20,6 @@ struct ContentView: View {
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @StateObject private var musicState = NotchMusicState()
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
-    @ObservedObject var notificationManager = SystemNotificationManager.shared
-    /// Which entry of the closed-notch activity stack is on top.
-    @ViewState private var activityIndex: Int = 0
     @ViewState private var hoverTask: Task<Void, Never>?
     @ViewState private var isHovering: Bool = false
     @ViewState private var anyDropDebounceTask: Task<Void, Never>?
@@ -54,7 +51,11 @@ struct ContentView: View {
     @Default(.showNotHumanFace) var showNotHumanFace
 
     // Use standardized animations from StandardAnimations enum
-    private let animationSpring = StandardAnimations.interactive
+    private var animationSpring: Animation { StandardAnimations.interactive }
+
+    private var notchTransitionAnimation: Animation? {
+        reduceMotion ? nil : (vm.notchState == .open ? StandardAnimations.open : StandardAnimations.close)
+    }
 
     private let extendedHoverPadding: CGFloat = 30
     private let zeroHeightHoverPadding: CGFloat = 10
@@ -65,10 +66,6 @@ struct ContentView: View {
 
     private var tabTransition: AnyTransition {
         reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 5))
-    }
-
-    private var presentingNotifications: Bool {
-        coordinator.notificationPresentation(for: vm, dragging: vm.dropInteraction.anyDropZoneTargeting) == .stack
     }
 
     // MARK: - Corner Radius Scaling
@@ -87,7 +84,6 @@ struct ContentView: View {
 
     private var topCornerRadius: CGFloat {
         // If the notch is open, return the opened radius.
-        if presentingNotifications { return 12 }
         if vm.notchState == .open {
             return openedInsets.top
         }
@@ -105,9 +101,7 @@ struct ContentView: View {
         let baseClosedBottom = cornerRadiusInsets.closed.bottom
         let bottomCorner: CGFloat
 
-        if presentingNotifications {
-            bottomCorner = 24
-        } else if vm.notchState == .open {
+        if vm.notchState == .open {
             bottomCorner = openedInsets.bottom
         } else if let scaleFactor = cornerRadiusScaleFactor {
             bottomCorner = max(0, baseClosedBottom * scaleFactor)
@@ -121,22 +115,10 @@ struct ContentView: View {
         )
     }
 
-    /// Music keeps its identity while notifications expand underneath it.
-    /// Message queue and interaction state live in NotificationManager.
-    private var liveActivities: [LiveActivityItem] {
-        var items: [LiveActivityItem] = []
-
-        // Keep music's identity and transport alive when a message emerges
-        // beneath it. Notifications get their own vertically stacked surface.
-
-        let musicIsShowing = (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
+    private var musicIsShowing: Bool {
+        (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
             && (musicState.snapshot.isPlaying || !musicState.snapshot.isPlayerIdle)
             && coordinator.musicLiveActivityEnabled
-        if musicIsShowing {
-            items.append(.music)
-        }
-
-        return items
     }
 
     /// Compact mode must use nil: this frame bounds hit-testing as well as
@@ -159,24 +141,17 @@ struct ContentView: View {
             && (!compactMode || coordinator.currentView == .timer)
     }
 
-    /// The activity currently on top of the stack — what the chin has to be
-    /// sized for.
-    private func selectedActivity(in items: [LiveActivityItem]) -> LiveActivityItem? {
-        guard !items.isEmpty else { return nil }
-        return items[min(max(activityIndex, 0), items.count - 1)]
-    }
-
     private enum ClosedNotchContent: Equatable {
         case hello
         case nowPlayingFallback
         case batteryStatus
         case osd(SneakContentType)
-        case activities([LiveActivityItem])
+        case music
         case face
         case idle
     }
 
-    private func closedNotchContent(for items: [LiveActivityItem]) -> ClosedNotchContent {
+    private func closedNotchContent() -> ClosedNotchContent {
         if coordinator.helloAnimationRunning { return .hello }
         if nowPlayingFallbackNoticeActive { return .nowPlayingFallback }
         if coordinator.expandingView.show,
@@ -187,8 +162,8 @@ struct ContentView: View {
         if coordinator.shouldShowSneakPeek(on: vm.screenUUID) {
             return .osd(coordinator.sneakPeekState(for: vm.screenUUID).type)
         }
-        if !items.isEmpty, !vm.hideOnClosed {
-            return .activities(items)
+        if musicIsShowing, !vm.hideOnClosed {
+            return .music
         }
         if !coordinator.expandingView.show,
            !musicState.snapshot.isPlaying,
@@ -200,8 +175,7 @@ struct ContentView: View {
         return .idle
     }
 
-    private func mainChinWidth(for items: [LiveActivityItem]) -> CGFloat {
-        if presentingNotifications { return 384 }
+    private func mainChinWidth() -> CGFloat {
         var chinWidth: CGFloat = vm.closedNotchSize.width
 
         if shouldDisplayNowPlayingFallbackNotice {
@@ -209,23 +183,9 @@ struct ContentView: View {
         } else if coordinator.expandingView.type == .battery && coordinator.expandingView.show
             && vm.notchState == .closed && showPowerStatusNotifications {
             chinWidth = 640
-        } else if vm.notchState == .closed, !vm.hideOnClosed, let activity = selectedActivity(in: items) {
-            // Sized for whichever activity is actually on top, not for
-            // whichever happens to exist — otherwise swiping to music while a
-            // notification is still in the stack leaves the chin at the
-            // notification's width.
-            switch activity {
-            case .notification:
-                chinWidth += (2 * max(0, vm.effectiveClosedNotchHeight - 12) + 20)
-            case .music:
-                chinWidth += (2 * max(0, displayClosedNotchHeight - 12) + 20 + 2 * liveActivityEdgeMargin + 2)
-                // The inline song-change peek widens the pill itself, so the
-                // chin has to grow with it — otherwise the hover region is
-                // narrower than what's on screen.
-                if showingInlineMusicPeek {
-                    chinWidth += 2 * inlineMusicPeekLabelWidth
-                }
-            }
+        } else if vm.notchState == .closed, !vm.hideOnClosed, musicIsShowing {
+            chinWidth += (2 * max(0, displayClosedNotchHeight - 12) + 20 + 2 * liveActivityEdgeMargin + 2)
+            if showingInlineMusicPeek { chinWidth += 2 * inlineMusicPeekLabelWidth }
         } else if !coordinator.expandingView.show && vm.notchState == .closed
             && (!musicState.snapshot.isPlaying && musicState.snapshot.isPlayerIdle) && showNotHumanFace
             && !vm.hideOnClosed {
@@ -275,9 +235,8 @@ struct ContentView: View {
 
     var body: some View {
         @Bindable var dropInteraction = vm.dropInteraction
-        let activities = liveActivities
-        let contentKey = closedNotchContent(for: activities)
-        let chinWidth = mainChinWidth(for: activities)
+        let contentKey = closedNotchContent()
+        let chinWidth = mainChinWidth()
         let satelliteWidth = satelliteWidth(chinWidth: chinWidth)
         let computedChinWidth = chinWidth + (satelliteVisible && vm.notchState == .closed ? 2 * (satelliteWidth + 8) : 0)
 
@@ -290,8 +249,8 @@ struct ContentView: View {
 
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
-                let mainLayout = LiquidGlassSurface(shape: currentNotchShape, expanded: vm.notchState == .open || presentingNotifications) {
-                    NotchLayout(activities: activities)
+                let mainLayout = LiquidGlassSurface(shape: currentNotchShape, expanded: vm.notchState == .open) {
+                    NotchLayout()
                         .environmentObject(vm)
                         .environment(\.colorScheme, .dark)
                         .frame(alignment: .top)
@@ -300,7 +259,6 @@ struct ContentView: View {
                 }
                     .frame(width: vm.notchState == .open ? (compactMode && coordinator.currentView != .timer ? 336 + 24 + 2 * openedInsets.top : vm.notchSize.width) : nil, alignment: .top)
                     .clipShape(currentNotchShape)
-                    .animation(reduceMotion ? nil : StandardAnimations.interactive, value: NotificationSurfaceTransition(state: notificationManager.state, presented: presentingNotifications, expanded: isHovering))
                           .overlay(alignment: .top) {
                               displayClosedNotchHeight.isZero && vm.notchState == .closed ? nil
                         : Rectangle()
@@ -309,7 +267,7 @@ struct ContentView: View {
                             .padding(.horizontal, topCornerRadius)
                     }
                     // Removed conditional bottom padding when using custom 0 notch to keep layout stable
-                    .opacity((isNotchHeightZero && vm.notchState == .closed && !presentingNotifications) ? 0.01 : 1)
+                    .opacity((isNotchHeightZero && vm.notchState == .closed) ? 0.01 : 1)
 
                 mainLayout
                     .overlay(alignment: .leading) {
@@ -345,19 +303,7 @@ struct ContentView: View {
                         }
                         .allowsHitTesting(false)
                     }
-                    .overlay(alignment: .bottomTrailing) {
-                        if vm.notchState == .open, notificationManager.activeNotification != nil {
-                            Button { notificationManager.showRecent(); vm.close() } label: {
-                                Label("\(notificationManager.state.notifications.count)", systemImage: "bell.fill")
-                                    .font(.system(size: 10, weight: .medium))
-                                    .padding(.horizontal, 7).padding(.vertical, 4)
-                                    .background(.black.opacity(0.8), in: Capsule())
-                            }
-                            .buttonStyle(.plain).foregroundStyle(.white.opacity(0.8))
-                            .accessibilityLabel("Show queued notifications")
-                            .padding(.trailing, 18).padding(.bottom, 8)
-                        }
-                    }
+
                     .overlay(alignment: .trailing) {
                         if satelliteVisible && vm.notchState == .closed {
                             FocusActivityAnchor(width: satelliteWidth, height: max(26, displayClosedNotchHeight - 4))
@@ -365,17 +311,16 @@ struct ContentView: View {
                         }
                     }
                     // Keep the visible surface anchored to the display top
-                    // as workspace or notification content changes height.
+                    // as workspace content changes height.
                     .frame(height: vm.notchState == .open ? openNotchHeight : nil, alignment: .top)
                     .conditionalModifier(true) { view in
                         return view
-                            .animation(reduceMotion ? nil : .smooth, value: gestureProgress)
-                            // Outermost on purpose: it only fires when the
-                            // closed-state content changes (the key is stable
-                            // across open/close), and when several keys change
-                            // at once the innermost animation wins, so the
-                            // open/close springs below keep precedence.
-                            .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: contentKey)
+                            .animation(reduceMotion ? nil : StandardAnimations.smooth, value: gestureProgress)
+                            .animation(reduceMotion ? nil : StandardAnimations.closedContent, value: contentKey)
+                            // Keep surface, shape and artwork on the same
+                            // opening/closing spring as the outer activity.
+                            // This also takes precedence over content changes.
+                            .animation(notchTransitionAnimation, value: vm.notchState)
 
                     }
                     .contentShape(Rectangle())
@@ -383,7 +328,7 @@ struct ContentView: View {
                         handleHover(hovering)
                     }
                     .onTapGesture {
-                        if vm.notchState == .closed && !shouldDisplayNowPlayingFallbackNotice && !presentingNotifications {
+                        if vm.notchState == .closed && !shouldDisplayNowPlayingFallbackNotice {
                             doOpen()
                         }
                     }
@@ -411,19 +356,12 @@ struct ContentView: View {
                     .onReceive(NotificationCenter.default.publisher(for: .sharingDidFinish)) { _ in
                         scheduleCloseIfNotHovering(overNotch: vm)
                     }
-                    // Keep the retained music activity selection in range.
-                    .onChange(of: notificationManager.activeNotification?.id) { _, newID in
-                        if newID != nil { activityIndex = 0 }
-                    }
-                    // Music may disappear independently of the message queue.
-                    .onChange(of: activities.count) { _, count in
-                        if activityIndex >= count { activityIndex = max(count - 1, 0) }
-                    }
                     .onChange(of: vm.isPopoverActive) { _, _ in
                         scheduleCloseIfNotHovering(overNotch: vm)
                     }
                     .sensoryFeedback(.alignment, trigger: haptics)
                     .contextMenu {
+
                         Button("Settings") {
                             DispatchQueue.main.async {
                                 SettingsWindowController.shared.showWindow()
@@ -459,7 +397,7 @@ struct ContentView: View {
             }
         }
         // One transaction drives the main surface and the persistent activity.
-        .animation(reduceMotion ? nil : (vm.notchState == .open ? StandardAnimations.open : StandardAnimations.close), value: vm.notchState)
+        .animation(notchTransitionAnimation, value: vm.notchState)
         .animation(reduceMotion ? nil : StandardAnimations.interactive, value: chinWidth)
         .animation(reduceMotion ? nil : StandardAnimations.focusTab, value: coordinator.currentView)
         .animation(reduceMotion ? nil : StandardAnimations.focusTab, value: focus.isActive)
@@ -469,7 +407,7 @@ struct ContentView: View {
             y: gestureScale,
             anchor: .top
         )
-        .animation(reduceMotion ? nil : .smooth, value: gestureProgress)
+        .animation(reduceMotion ? nil : StandardAnimations.smooth, value: gestureProgress)
         .background(dragDetector)
         .environmentObject(vm)
         .onChange(of: vm.notchState) { _, _ in gestureProgress = .zero }
@@ -504,7 +442,7 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    func NotchLayout(activities: [LiveActivityItem]) -> some View {
+    func NotchLayout() -> some View {
         @Bindable var dropInteraction = vm.dropInteraction
 
         VStack(alignment: .center, spacing: 0) {
@@ -561,26 +499,14 @@ struct ContentView: View {
                               gestureProgress: $gestureProgress
                           )
                               .transition(.opacity)
-                      } else if !activities.isEmpty && vm.notchState == .closed && !vm.hideOnClosed {
-                          LiveActivityStack(items: activities, index: $activityIndex) { item in
-                              switch item {
-                              case .notification(let notification):
-                                  NotificationLiveActivity(notification: notification)
-                              case .music:
-                                  NotchMusicActivityView(height: displayClosedNotchHeight, cornerScale: cornerRadiusScaleFactor,
-                                      centerWidth: musicActivityCenterWidth, closedWidth: vm.closedNotchSize.width,
-                                      gesture: gestureProgress, albumArtNamespace: albumArtNamespace)
-                                      .frame(alignment: .center)
-                              }
-                          }
-                      } else if !presentingNotifications && !coordinator.expandingView.show && vm.notchState == .closed && (!musicState.snapshot.isPlaying && musicState.snapshot.isPlayerIdle) && showNotHumanFace && !vm.hideOnClosed {
+                      } else if musicIsShowing && vm.notchState == .closed && !vm.hideOnClosed {
+                          NotchMusicActivityView(height: displayClosedNotchHeight, cornerScale: cornerRadiusScaleFactor,
+                              centerWidth: musicActivityCenterWidth, closedWidth: vm.closedNotchSize.width,
+                              gesture: gestureProgress, albumArtNamespace: albumArtNamespace)
+                              .frame(alignment: .center)
+                      } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicState.snapshot.isPlaying && musicState.snapshot.isPlayerIdle) && showNotHumanFace && !vm.hideOnClosed {
                           BoringFaceAnimation()
                        } else if showsHeader {
-                           // No tab bar over a notification: it's a glance,
-                           // not a place to switch between home and shelf —
-                           // and the header spans the full notch width,
-                           // which is what was stretching the whole panel
-                           // out around a short message.
                            BoringHeader()
                                .frame(height: max(38, displayClosedNotchHeight))
                        } else if vm.notchState == .open && focus.isActive && compactMode {
@@ -642,14 +568,10 @@ struct ContentView: View {
                               .fixedSize()
                       }
                       .zIndex(1)
-            if presentingNotifications {
-                NotificationQueueView(manager: notificationManager, musicIsPlaying: musicState.snapshot.isPlaying, expanded: isHovering)
-                    .transition(.asymmetric(insertion: .offset(y: -12).combined(with: .opacity), removal: .opacity))
-            }
+
             if vm.notchState == .open {
                 VStack {
                     // An explicitly opened workspace retains its own content.
-                    // Pending notifications emerge after the workspace closes.
                     if compactMode && coordinator.currentView != .timer {
                         // Player only — no tab switching, so currentView is
                         // ignored here rather than offering a shelf the
@@ -814,7 +736,7 @@ extension ContentView {
     @discardableResult
     private func doOpen() -> Bool {
         var didOpen = false
-        withAnimation(animationSpring) {
+        withAnimation(reduceMotion ? nil : animationSpring) {
             didOpen = vm.open()
         }
         return didOpen
@@ -848,17 +770,8 @@ extension ContentView {
         hoverTask?.cancel()
 
         if hovering {
-            withAnimation(animationSpring) {
+            withAnimation(reduceMotion ? nil : animationSpring) {
                 isHovering = true
-            }
-
-            // Freeze the dismiss countdown the moment the pointer arrives,
-            // not when the notch finishes opening. Opening waits out
-            // minimumHoverDuration plus an animation, and a notification
-            // near the end of its life would expire during that — so it
-            // vanished exactly as the notch opened around it.
-            if notificationManager.activeNotification != nil {
-                notificationManager.holdActive()
             }
 
             if vm.notchState == .closed && enableHaptics {
@@ -866,7 +779,6 @@ extension ContentView {
             }
 
             guard vm.notchState == .closed,
-                  !presentingNotifications,
                   !shouldDisplayNowPlayingFallbackNotice,
                   !coordinator.shouldShowSneakPeek(on: vm.screenUUID),
                   openNotchOnHover else { return }
@@ -890,12 +802,9 @@ extension ContentView {
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
-                    withAnimation(animationSpring) {
+                    withAnimation(reduceMotion ? nil : animationSpring) {
                         self.isHovering = false
                     }
-
-                    // Pointer left — let the notification age out again.
-                    self.notificationManager.resumeDismiss()
 
                     if self.vm.notchState == .open,
                        !self.vm.isPopoverActive,
@@ -911,12 +820,12 @@ extension ContentView {
 
     private func handleDownGesture(translation: CGFloat, phase: NSEvent.Phase) {
         if phase == .ended || phase == .cancelled {
-            withAnimation(animationSpring) { gestureProgress = .zero }
+            withAnimation(reduceMotion ? nil : animationSpring) { gestureProgress = .zero }
             return
         }
         guard vm.notchState == .closed else { return }
 
-        withAnimation(animationSpring) {
+        withAnimation(reduceMotion ? nil : animationSpring) {
             gestureProgress = (translation / gestureSensitivity) * 20
         }
 
@@ -924,7 +833,7 @@ extension ContentView {
             if enableHaptics {
                 haptics.toggle()
             }
-            withAnimation(animationSpring) {
+            withAnimation(reduceMotion ? nil : animationSpring) {
                 gestureProgress = .zero
             }
             doOpen()
@@ -933,17 +842,17 @@ extension ContentView {
 
     private func handleUpGesture(translation: CGFloat, phase: NSEvent.Phase) {
         if phase == .ended || phase == .cancelled {
-            withAnimation(animationSpring) { gestureProgress = .zero }
+            withAnimation(reduceMotion ? nil : animationSpring) { gestureProgress = .zero }
             return
         }
         guard vm.notchState == .open && !vm.isHoveringCalendar else { return }
 
-        withAnimation(animationSpring) {
+        withAnimation(reduceMotion ? nil : animationSpring) {
             gestureProgress = (translation / gestureSensitivity) * -20
         }
 
         if translation > gestureSensitivity {
-            withAnimation(animationSpring) {
+            withAnimation(reduceMotion ? nil : animationSpring) {
                 isHovering = false
             }
             if !SharingStateManager.shared.preventNotchClose {
@@ -1009,7 +918,7 @@ extension ContentView {
 
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(140))
-            withAnimation(animationSpring) {
+            withAnimation(reduceMotion ? nil : animationSpring) {
                 horizontalMediaGestureFeedback = .zero
                 if vm.notchState == .closed {
                     gestureProgress = .zero
@@ -1019,7 +928,6 @@ extension ContentView {
     }
 
     private var isHorizontalMediaGestureContext: Bool {
-        guard !presentingNotifications else { return false }
         switch vm.notchState {
         case .closed:
             guard !vm.hideOnClosed else { return false }

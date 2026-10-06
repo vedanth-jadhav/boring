@@ -23,7 +23,8 @@ extension View {
     func panGesture(direction: PanDirection, threshold: CGFloat = 4, action: @escaping (CGFloat, NSEvent.Phase) -> Void) -> some View {
         self
             .gesture(
-                DragGesture(minimumDistance: 0)
+                // Do not claim a click before it can reach a button in the notch.
+                DragGesture(minimumDistance: threshold)
                     .onChanged { value in
                         let s = direction.signed(from: value.translation)
                         guard s > 0, s.magnitude >= threshold else { return }
