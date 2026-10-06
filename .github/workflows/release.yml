@@ -1,24 +1,43 @@
-name: Publish DMG release
+name: Build macOS release
 
 on:
   push:
-    branches: [main]
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
-    runs-on: macos-15
+    # The app requires the macOS 27 SDK. GitHub's xcode-27 runner image
+    # includes the matching Xcode/Command Line Tools and Apple Swift toolchain.
+    runs-on: xcode-27
     steps:
-      - uses: actions/checkout@v4
-      - name: Create release for latest snapshot
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Build and package ad-hoc signed DMG
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tags must use vMAJOR.MINOR.PATCH (got $GITHUB_REF_NAME)" >&2
+            exit 2
+          fi
+          bash Scripts/package_release.sh "$version"
+
+      - name: Publish GitHub Release with DMG and checksum
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          gh release view latest >/dev/null 2>&1 && gh release delete latest --yes || true
-          gh release create latest 'dist/Boring Notch Octave.dmg' \
-            --repo "$GITHUB_REPOSITORY" \
-            --title 'Latest Boring Notch Octave build' \
-            --notes 'Latest private build from main. Download the DMG and drag the app to Applications.' \
-            --latest
+          gh release create "$GITHUB_REF_NAME" \
+            "build/releases/Boring-Notch-Octave-${GITHUB_REF_NAME#v}-macOS.dmg" \
+            "build/releases/Boring-Notch-Octave-${GITHUB_REF_NAME#v}-macOS.dmg.sha256" \
+            --title "Boring Notch Octave ${GITHUB_REF_NAME#v}" \
+            --generate-notes
