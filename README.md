@@ -6,9 +6,9 @@ This repository is the source for **Boring Notch Octave**. It is an independentl
 
 ## Demo
 
-[![Watch the Boring Notch Octave demo](assets/boring-notch-octave-demo.gif)](assets/boring-notch-octave-demo.mov)
+[![Watch the Boring Notch Octave demo](assets/boring-notch-octave-demo.gif)](assets/boring-notch-octave-demo.mp4)
 
-[Open the full 13-second screen recording](assets/boring-notch-octave-demo.mov).
+[Watch the 15-second app tour](assets/boring-notch-octave-demo.mp4). Music, Shelf, focus sessions, and Codex usage, recorded on my Mac. Cropped at native resolution, with click indicators edited out and short transitions between actions.
 
 ## What changed from upstream
 
