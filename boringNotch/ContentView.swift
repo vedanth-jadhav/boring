@@ -49,6 +49,9 @@ struct ContentView: View {
     @Default(.minimumHoverDuration) private var minimumHoverDuration
     @Default(.gestureSensitivity) private var gestureSensitivity
     @Default(.showNotHumanFace) var showNotHumanFace
+    @Default(.codexUsageDisplay) private var codexUsageDisplay
+    @Default(.codexActivityConflict) private var codexActivityConflict
+    private var codexPreferences = CodexGlancePreferences()
 
     // Use standardized animations from StandardAnimations enum
     private var animationSpring: Animation { StandardAnimations.interactive }
@@ -200,6 +203,20 @@ struct ContentView: View {
         focus.isActive && !vm.hideOnClosed && displayClosedNotchHeight >= 20
     }
 
+    private var codexSatelliteVisible: Bool {
+        codexUsageDisplay == .pill && !vm.hideOnClosed && displayClosedNotchHeight >= 20
+            && !(focus.isActive && codexActivityConflict == .insideWhileFocusing)
+    }
+
+    private func codexSatelliteWidth(chinWidth: CGFloat) -> CGFloat {
+        let available = (activityCanvasWidth - chinWidth) / 2 - 6
+        return max(40, min(codexPreferences.width(expanded: false), available))
+    }
+
+    private var compactCodexWidth: CGFloat {
+        codexPreferences.width(expanded: true)
+    }
+
     private var activityCanvasWidth: CGFloat {
         min(windowSize.width, getScreenFrame(vm.screenUUID)?.width ?? windowSize.width)
     }
@@ -239,7 +256,9 @@ struct ContentView: View {
         let contentKey = closedNotchContent()
         let chinWidth = mainChinWidth()
         let satelliteWidth = satelliteWidth(chinWidth: chinWidth)
-        let computedChinWidth = chinWidth + (satelliteVisible && vm.notchState == .closed ? 2 * (satelliteWidth + 8) : 0)
+        let codexWidth = codexSatelliteWidth(chinWidth: chinWidth)
+        let activityWidth = max(satelliteVisible ? satelliteWidth : 0, codexSatelliteVisible ? codexWidth : 0)
+        let computedChinWidth = chinWidth + (activityWidth > 0 && vm.notchState == .closed ? 2 * (activityWidth + 8) : 0)
 
         // Calculate scale based on gesture progress only
         let gestureScale: CGFloat = {
@@ -305,10 +324,25 @@ struct ContentView: View {
                         .allowsHitTesting(false)
                     }
 
-                    .overlay(alignment: .trailing) {
-                        if satelliteVisible && vm.notchState == .closed {
-                            FocusActivityAnchor(width: satelliteWidth, height: max(26, displayClosedNotchHeight - 4))
+                    .overlay(alignment: .topTrailing) {
+                        if codexSatelliteVisible && vm.notchState == .closed {
+                            let height = max(22, min(CodexActivityMetrics.height, displayClosedNotchHeight - 4))
+                            CodexActivityAnchor(width: codexWidth, height: height)
+                                .padding(.top, max(0, (displayClosedNotchHeight - height) / 2))
+                                .offset(x: codexWidth + 6)
+                        } else if satelliteVisible && vm.notchState == .closed {
+                            let height = max(26, displayClosedNotchHeight - 4)
+                            FocusActivityAnchor(width: satelliteWidth, height: height)
+                                .padding(.top, max(0, (displayClosedNotchHeight - height) / 2))
                                 .offset(x: satelliteWidth + 8)
+                        }
+                    }
+                    .overlay(alignment: .topLeading) {
+                        if codexSatelliteVisible && satelliteVisible && vm.notchState == .closed {
+                            let height = max(26, displayClosedNotchHeight - 4)
+                            FocusActivityAnchor(width: satelliteWidth, height: height)
+                                .padding(.top, max(0, (displayClosedNotchHeight - height) / 2))
+                                .offset(x: -(satelliteWidth + 8))
                         }
                     }
                     // Keep the visible surface anchored to the display top
@@ -397,11 +431,26 @@ struct ContentView: View {
                 }
             }
         }
+        .overlayPreferenceValue(CodexActivityAnchorKey.self) { anchor in
+            GeometryReader { geometry in
+                if codexUsageDisplay == .pill, let anchor {
+                    let rect = geometry[anchor]
+                    CodexActivityView(width: rect.width, height: rect.height, expanded: vm.notchState == .open, open: openCodex)
+                        .onHover { handleHover($0) }
+                        .position(x: rect.midX, y: rect.midY)
+                        .transition(.opacity)
+                }
+            }
+        }
         // One transaction drives the main surface and the persistent activity.
         .animation(notchTransitionAnimation, value: vm.notchState)
         .animation(reduceMotion ? nil : StandardAnimations.interactive, value: chinWidth)
         .animation(reduceMotion ? nil : StandardAnimations.focusTab, value: coordinator.currentView)
         .animation(reduceMotion ? nil : StandardAnimations.focusTab, value: focus.isActive)
+        .animation(reduceMotion ? nil : StandardAnimations.focusTab, value: codexUsageDisplay)
+        .animation(reduceMotion ? nil : StandardAnimations.focusTab, value: codexActivityConflict)
+        .animation(reduceMotion ? nil : StandardAnimations.focusTab, value: codexPreferences.width(expanded: false))
+        .animation(reduceMotion ? nil : StandardAnimations.focusTab, value: codexPreferences.width(expanded: true))
         .ignoresSafeArea(.all)
         .scaleEffect(
             x: gestureScale,
@@ -411,8 +460,17 @@ struct ContentView: View {
         .animation(reduceMotion ? nil : StandardAnimations.smooth, value: gestureProgress)
         .background(dragDetector)
         .environmentObject(vm)
-        .onChange(of: vm.notchState) { _, _ in gestureProgress = .zero }
+        .onChange(of: vm.notchState) { _, state in
+            gestureProgress = .zero
+            if state == .open && codexUsageDisplay != .off {
+                Task { await CodexUsageStore.shared.refreshAllowance(force: true) }
+            }
+        }
         .onChange(of: coordinator.currentView) { _, _ in gestureProgress = .zero }
+        .onAppear { CodexUsageStore.shared.setGlanceMonitoring(enabled: codexUsageDisplay != .off) }
+        .onChange(of: codexUsageDisplay) {
+            CodexUsageStore.shared.setGlanceMonitoring(enabled: codexUsageDisplay != .off)
+        }
         .onChange(of: dropInteraction.anyDropZoneTargeting) { _, isTargeted in
             anyDropDebounceTask?.cancel()
 
@@ -510,12 +568,25 @@ struct ContentView: View {
                        } else if showsHeader {
                            BoringHeader()
                                .frame(height: max(38, displayClosedNotchHeight))
-                       } else if vm.notchState == .open && focus.isActive && compactMode {
+                       } else if vm.notchState == .open && compactMode && (focus.isActive || codexUsageDisplay != .off) {
                            HStack {
-                               Button("Timer", systemImage: "timer") { coordinator.currentView = .timer }
-                                   .buttonStyle(.plain).font(.caption)
+                               if focus.isActive {
+                                   FocusActivityAnchor(width: FocusActivityMetrics.width(for: focus.session.duration))
+                               }
                                Spacer()
-                               FocusActivityAnchor(width: FocusActivityMetrics.width(for: focus.session.duration))
+                               if codexUsageDisplay == .pill {
+                                   CodexActivityAnchor(width: compactCodexWidth)
+                               } else if codexUsageDisplay == .text {
+                                   CodexInlineUsageView(width: compactCodexWidth, open: openCodex)
+                               }
+                               if Defaults[.settingsIconInNotch] {
+                                   Button("Settings", systemImage: "gear") {
+                                       SettingsWindowController.shared.showWindow()
+                                   }
+                                   .labelStyle(.iconOnly).buttonStyle(.plain)
+                                   .font(.system(size: 12)).foregroundStyle(.white)
+                                   .frame(width: 26, height: 26)
+                               }
                            }
                            .frame(width: 336, height: 30)
                        }
@@ -737,6 +808,13 @@ struct ContentView: View {
 // MARK: - Gesture & Hover Handling
 
 extension ContentView {
+    private func openCodex() {
+        withAnimation(reduceMotion ? nil : StandardAnimations.focusTab) {
+            coordinator.currentView = .codex
+            doOpen()
+        }
+    }
+
     @discardableResult
     private func doOpen() -> Bool {
         var didOpen = false

@@ -56,10 +56,10 @@ actor CodexUsageClient {
         return Credentials(identity: identity, accessToken: token, accountID: account)
     }
 
-    func quota(credentials: Credentials) async throws -> CodexQuotaSnapshot {
+    func quota(credentials: Credentials, includeResetCredits: Bool = true) async throws -> CodexQuotaSnapshot {
         let json = try await request(path: "usage", credentials: credentials)
         guard var snapshot = CodexQuotaSnapshot.parse(json, at: Date()) else { throw Failure.invalidResponse }
-        if let reset = try? await request(path: "rate-limit-reset-credits", credentials: credentials) {
+        if includeResetCredits, let reset = try? await request(path: "rate-limit-reset-credits", credentials: credentials) {
             snapshot.applyResetCredits(reset, now: Date())
         }
         try Task.checkCancellation()

@@ -31,6 +31,10 @@ struct EnhancedLyricsSettingsView: View {
             }
 
             HStack(spacing: 10) {
+                if model.needsKeychainAccess {
+                    Button("Authorize saved key", action: model.authorizeSavedKey)
+                        .disabled(model.isBusy)
+                }
                 Button("Save & Enable") { model.saveAndEnable() }
                     .disabled(!model.canSave)
                 if model.isBusy {

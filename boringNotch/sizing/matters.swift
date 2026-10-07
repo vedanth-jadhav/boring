@@ -13,7 +13,7 @@ let shadowPadding: CGFloat = 20
 let openNotchSize: CGSize = .init(width: 640, height: 190)
 // Reserve satellite space while keeping the physical notch centered. The
 // transparent canvas never owns hover; only the notch and pill do.
-let windowSize: CGSize = .init(width: openNotchSize.width + 2 * (90 + 8), height: max(openNotchSize.height, 330) + shadowPadding)
+let windowSize: CGSize = .init(width: openNotchSize.width + 2 * (112 + 8), height: max(openNotchSize.height, 330) + shadowPadding)
 let cornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 19, bottom: 32), closed: (top: 6, bottom: 14))
 
 /// Compact mode uses a much rounder opened shape than the standard layout

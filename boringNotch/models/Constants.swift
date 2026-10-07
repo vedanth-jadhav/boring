@@ -386,6 +386,16 @@ enum PreferenceCompatibility {
 }
 
 extension Defaults.Keys {
+    // MARK: Codex glance
+    static let codexUsageDisplay = Key<CodexUsageDisplay>("codexUsageDisplay", default: .off)
+    static let codexActivityConflict = Key<CodexActivityConflict>("codexActivityConflict", default: .oppositeSides)
+    static let codexPillLimit = Key<CodexPillLimit>("codexPillLimit", default: .session)
+    static let codexPillMetric = Key<CodexPillMetric>("codexPillMetric", default: .remaining)
+    static let codexShowLimitLabel = Key<Bool>("codexShowLimitLabel", default: true)
+    static let codexInsideMatchesPill = Key<Bool>("codexInsideMatchesPill", default: true)
+    static let codexInsideLimit = Key<CodexPillLimit>("codexInsideLimit", default: .session)
+    static let codexInsideMetric = Key<CodexPillMetric>("codexInsideMetric", default: .remaining)
+    static let codexInsideShowLimitLabel = Key<Bool>("codexInsideShowLimitLabel", default: true)
     // MARK: General
     static let appLanguage = Key<AppLanguage>("appLanguage", default: .system)
     static let menubarIcon = Key<Bool>("menubarIcon", default: true)

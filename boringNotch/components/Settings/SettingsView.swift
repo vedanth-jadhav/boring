@@ -12,6 +12,7 @@ import SwiftUIIntrospect
 private enum SettingsTab: String, CaseIterable, Identifiable {
     case general
     case notch
+    case codex
     case appearance
     case media
     case calendar
@@ -33,6 +34,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: "General"
         case .notch: "Notch"
+        case .codex: "Codex"
         case .appearance: "Appearance"
         case .media: "Media"
         case .calendar: "Calendar"
@@ -49,6 +51,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: .system("gear")
         case .notch: .custom("notch")
+        case .codex: .system("terminal")
         case .appearance: .system("paintbrush")
         case .media: .system("play.rectangle")
         case .calendar: .system("calendar")
@@ -92,6 +95,8 @@ struct SettingsView: View {
                     GeneralSettings()
                 case .notch:
                     NotchSettingsView()
+                case .codex:
+                    CodexUsageSettingsView()
                 case .appearance:
                     AppearanceSettingsView()
                 case .media:

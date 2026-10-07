@@ -81,7 +81,7 @@ struct FocusActivityView: View {
             }
             .clipShape(Capsule())
             .contentShape(Capsule())
-            .onHover { hovering in controlsVisible = expanded && hovering }
+            .onHover { hovering in controlsVisible = expanded && width >= 70 && hovering }
             .onChange(of: expanded) { _, _ in controlsVisible = false }
         }
     }

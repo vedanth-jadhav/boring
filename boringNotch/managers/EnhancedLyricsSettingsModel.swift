@@ -6,6 +6,7 @@ import Foundation
 final class EnhancedLyricsSettingsModel: ObservableObject {
     @Published var draftKey = ""
     @Published private(set) var hasSavedKey = false
+    @Published private(set) var needsKeychainAccess = false
     @Published private(set) var isBusy = false
     @Published private(set) var progressText = "Checking API key…"
     @Published private(set) var message: String?
@@ -15,9 +16,13 @@ final class EnhancedLyricsSettingsModel: ObservableObject {
     var canSave: Bool { !isBusy && !draftKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     func loadStatus() async {
-        let saved = await Task.detached(priority: .utility) { SpicyLyricsCredential.load() != nil }.value
+        let status = await Task.detached(priority: .utility) { SpicyLyricsCredential.savedStatus() }.value
         guard !Task.isCancelled else { return }
-        hasSavedKey = saved
+        hasSavedKey = status != .missing
+        needsKeychainAccess = status == .needsAccess
+        if status == .needsAccess {
+            report("Your key is still saved in Keychain. Authorize it once below to restore enhanced lyrics. The app won’t request access automatically on launch.", error: true)
+        }
     }
 
     func saveAndEnable() {
@@ -41,6 +46,7 @@ final class EnhancedLyricsSettingsModel: ObservableObject {
                     try await Task.detached(priority: .utility) { try SpicyLyricsCredential.save(key) }.value
                     await SpicyLyricsClient.shared.reloadCredential()
                     self.hasSavedKey = true
+                    self.needsKeychainAccess = false
                     self.draftKey = ""
                     Defaults[.enableEnhancedLyrics] = true
                     Defaults[.enableLyrics] = true
@@ -72,8 +78,27 @@ final class EnhancedLyricsSettingsModel: ObservableObject {
                 Defaults[.enableEnhancedLyrics] = false
                 LyricsService.shared.configurationChanged()
                 self.hasSavedKey = false
+                self.needsKeychainAccess = false
                 self.draftKey = ""
                 self.report("Key removed. Regular lyrics are active.", error: false)
+            } catch { self.report(error.localizedDescription, error: true) }
+        }
+    }
+
+    func authorizeSavedKey() {
+        guard !isBusy else { return }
+        isBusy = true
+        progressText = "Authorizing saved key…"
+        operation = Task { [weak self] in
+            guard let self else { return }
+            defer { self.isBusy = false }
+            do {
+                try await Task.detached(priority: .utility) { try SpicyLyricsCredential.authorizeSavedKey() }.value
+                await SpicyLyricsClient.shared.reloadCredential()
+                self.needsKeychainAccess = false
+                self.hasSavedKey = true
+                LyricsService.shared.configurationChanged()
+                self.report("Saved key authorized for this signed app.", error: false)
             } catch { self.report(error.localizedDescription, error: true) }
         }
     }

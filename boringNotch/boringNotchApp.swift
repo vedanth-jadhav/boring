@@ -164,6 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         MainActor.assumeIsolated {
             FocusSessionManager.shared.shutdown()
+            CodexUsageStore.shared.setGlanceMonitoring(enabled: false)
             CaffeineManager.shared.releaseAll()
             MusicManager.shared.destroy()
             windowManager.cleanup()
@@ -195,6 +196,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         CursorShelfController.shared.start()
         ScreenshotShelfService.shared.start()
         _ = FocusSessionManager.shared
+        CodexUsageStore.shared.setGlanceMonitoring(enabled: Defaults[.codexUsageDisplay] != .off)
         do {
             if let migratedURL = try LegacyAppBundleMigration.migrateIfNeeded(at: Bundle.main.bundleURL) {
                 isMigratingLegacyBundle = true

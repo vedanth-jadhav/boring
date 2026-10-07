@@ -31,11 +31,12 @@ actor SpicyLyricsClient {
     private let cacheDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         .appendingPathComponent("local.vedanth.boringnotch.octave/SpicyLyrics", isDirectory: true)
     private var key: String?
+    private var credentialLoaded = false
     private var failedUntil: [String: Date] = [:]
     private var serverRetry: [String: Date] = [:]
     private var nextMetadataRequest = Date.distantPast
 
-    init(credential: String? = nil) { key = credential }
+    init(credential: String? = nil) { key = credential; credentialLoaded = credential != nil }
 
     enum KeyValidation: Equatable {
         case valid, invalid, restricted, rateLimited, unavailable
@@ -60,6 +61,7 @@ actor SpicyLyricsClient {
 
     func reloadCredential() {
         key = nil
+        credentialLoaded = false
         failedUntil.removeAll(keepingCapacity: true)
         serverRetry.removeAll(keepingCapacity: true)
     }
@@ -67,7 +69,10 @@ actor SpicyLyricsClient {
     func fetch(title: String, artist: String, album: String, duration: Double) async -> SpicyLyricsPayload? {
         let duration = duration.isFinite && duration > 0 ? min(duration, 86400) : 0
         guard !title.isEmpty, !artist.isEmpty else { return nil }
-        if key == nil { key = SpicyLyricsCredential.load() }
+        if !credentialLoaded {
+            key = SpicyLyricsCredential.load()
+            credentialLoaded = true
+        }
         guard let key else { return nil }
         let identity = [normalized(title), normalized(artist), normalized(album), String(Int(duration.rounded()))].joined(separator: "|")
         let cacheURL = cacheDirectory.appendingPathComponent("lyrics-\(digest(identity)).json")

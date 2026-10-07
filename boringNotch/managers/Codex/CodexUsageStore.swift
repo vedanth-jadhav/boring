@@ -33,6 +33,14 @@ final class CodexUsageStore {
     @ObservationIgnored private var lastPricingAttempt = Date.distantPast
     @ObservationIgnored private var lastLocalAttempt = Date.distantPast
     @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var glanceTask: Task<Void, Never>?
+    @ObservationIgnored private var quotaFailures = 0
+    @ObservationIgnored private var credentialRevision: Date?
+
+    private var quotaCacheURL: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("local.vedanth.boringnotch.octave/Codex/allowance.json")
+    }
 
     init(home: URL? = nil) {
         let custom = UserDefaults.standard.string(forKey: "codexUsageHome")
@@ -48,9 +56,39 @@ final class CodexUsageStore {
         }
     }
 
+    /// The glance needs allowance only; token scanning and pricing stay in the dashboard.
+    func setGlanceMonitoring(enabled: Bool) {
+        if enabled {
+            guard glanceTask == nil else { return }
+            glanceTask = Task { [weak self] in
+                guard let self else { return }
+                await self.monitorAllowance()
+            }
+        } else {
+            glanceTask?.cancel()
+            glanceTask = nil
+        }
+    }
+
+    private func monitorAllowance() async {
+        while !Task.isCancelled {
+            let revision = try? home.appendingPathComponent("auth.json").resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+            let changed = revision != credentialRevision
+            credentialRevision = revision
+            await refreshAllowance(force: changed)
+            do { try await Task.sleep(for: .seconds(5)) } catch { return }
+        }
+    }
+
+    func refreshAllowance(force: Bool = false) async {
+        await refreshQuota(force: force)
+        guard !Task.isCancelled else { return }
+        if quota == nil || quota?.isLocal == true { await refreshLocal(force: false) }
+    }
+
     func refresh(force: Bool = false) async {
         async let local: Void = refreshLocal(force: force)
-        async let remote: Void = refreshQuota(force: force)
+        async let remote: Void = refreshQuota(force: force, includeResetCredits: true)
         async let pricing: Void = refreshPricing(force: force)
         _ = await (local, remote, pricing)
     }
@@ -63,6 +101,7 @@ final class CodexUsageStore {
         quotaError = nil; localError = nil
         daily = [:]; localUpdatedAt = nil; fileCount = 0
         lastQuotaAttempt = .distantPast; lastLocalAttempt = .distantPast
+        quotaFailures = 0; credentialRevision = nil
         rebuildSummary()
     }
 
@@ -87,9 +126,9 @@ final class CodexUsageStore {
         }
     }
 
-    private func refreshQuota(force: Bool) async {
-        let resetPassed = quota?.windows.contains(where: { $0.needsRefresh(at: Date()) }) ?? false
-        guard !isRefreshing, force || Date().timeIntervalSince(lastQuotaAttempt) >= (resetPassed ? 15 : 60) else { return }
+    private func refreshQuota(force: Bool, includeResetCredits: Bool = false) async {
+        let interval = quotaFailures == 0 ? 5 : min(60, 5 * pow(2, Double(min(quotaFailures, 4))))
+        guard !isRefreshing, force || Date().timeIntervalSince(lastQuotaAttempt) >= interval else { return }
         isRefreshing = true; lastQuotaAttempt = Date()
         defer { isRefreshing = false }
         let version = generation
@@ -99,15 +138,31 @@ final class CodexUsageStore {
             if identity != nil, identity != credentials.identity { quota = nil; recordedQuota = nil }
             identity = credentials.identity
             allowsRecordedQuota = true
-            let snapshot = try await client.quota(credentials: credentials)
+            if quota == nil,
+               let data = try? Data(contentsOf: quotaCacheURL),
+               let cached = try? JSONDecoder().decode(CodexCachedQuota.self, from: data),
+               cached.identity == credentials.identity {
+                quota = cached.snapshot
+            }
+            var snapshot = try await client.quota(credentials: credentials, includeResetCredits: includeResetCredits)
             let latest = try await client.credentials(home: home)
             try Task.checkCancellation()
             guard version == generation else { return }
             guard latest.identity == credentials.identity else { quota = nil; lastQuotaAttempt = .distantPast; return }
-            quota = snapshot; quotaError = nil
+            if !includeResetCredits {
+                snapshot.resetCredits = quota?.resetCredits ?? []
+                snapshot.resetCount = snapshot.resetCount ?? quota?.resetCount
+            }
+            quota = snapshot; quotaError = nil; quotaFailures = 0
+            if let data = try? JSONEncoder().encode(CodexCachedQuota(identity: credentials.identity, snapshot: snapshot)) {
+                try? FileManager.default.createDirectory(at: quotaCacheURL.deletingLastPathComponent(), withIntermediateDirectories: true,
+                                                         attributes: [.posixPermissions: 0o700])
+                try? data.write(to: quotaCacheURL, options: .atomic)
+            }
         } catch is CancellationError { lastQuotaAttempt = .distantPast }
         catch {
             guard version == generation else { return }
+            quotaFailures += 1
             if case CodexUsageClient.Failure.notSignedIn = error { quota = nil; identity = nil; allowsRecordedQuota = false }
             if case CodexUsageClient.Failure.apiKey = error { quota = nil; identity = nil; allowsRecordedQuota = false }
             if quota == nil, allowsRecordedQuota { quota = recordedQuota }

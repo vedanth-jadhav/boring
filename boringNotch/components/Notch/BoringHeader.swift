@@ -14,6 +14,19 @@ struct BoringHeader: View {
     @ObservedObject private var focus = FocusSessionManager.shared
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @StateObject var shelfState = ShelfStateViewModel.shared
+    @Default(.codexUsageDisplay) private var codexUsageDisplay
+    private var codexPreferences = CodexGlancePreferences()
+
+    private var codexWidth: CGFloat {
+        let corners = Defaults[.compactMode] ? compactCornerRadiusInsets.opened.top : cornerRadiusInsets.opened.top
+        let sideWidth = (vm.notchSize.width - 24 - 2 * corners - vm.closedNotchSize.width) / 2
+        let battery: CGFloat = Defaults[.showBatteryIndicator] ? (Defaults[.showBatteryPercentage] ? 72 : 34) : 0
+        let settings: CGFloat = Defaults[.settingsIconInNotch] ? 34 : 0
+        let mirror: CGFloat = Defaults[.showMirror] && coordinator.currentView == .home ? 34 : 0
+        let activity: CGFloat = focus.isActive ? 44 : 0
+        let available = max(40, sideWidth - battery - settings - mirror - activity - 6)
+        return min(available, codexPreferences.width(expanded: true))
+    }
     var body: some View {
         HStack(spacing: 0) {
             HStack {
@@ -40,8 +53,18 @@ struct BoringHeader: View {
             HStack(spacing: 4) {
                 if vm.notchState == .open {
                     if focus.isActive {
-                        FocusActivityAnchor(width: FocusActivityMetrics.width(for: focus.session.duration))
+                        FocusActivityAnchor(width: codexUsageDisplay == .off ? FocusActivityMetrics.width(for: focus.session.duration) : 36)
                             .padding(.trailing, 4)
+                    }
+                    if codexUsageDisplay == .pill {
+                        CodexActivityAnchor(width: codexWidth).padding(.trailing, 2)
+                    } else if codexUsageDisplay == .text {
+                        CodexInlineUsageView(width: codexWidth) {
+                            withAnimation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : StandardAnimations.focusTab) {
+                                coordinator.currentView = .codex
+                            }
+                        }
+                        .padding(.trailing, 2)
                     }
                     if isOSDType(coordinator.sneakPeekState(for: vm.screenUUID).type) && coordinator.shouldShowSneakPeek(on: vm.screenUUID) && Defaults[.showOpenNotchOSD] {
                         OpenNotchOSD(
@@ -99,6 +122,7 @@ struct BoringHeader: View {
                                 maxAdapterWatts: batteryModel.maxAdapterWatts,
                                 isForNotification: false
                             )
+                            .fixedSize(horizontal: true, vertical: false)
                         }
                     }
                 }
