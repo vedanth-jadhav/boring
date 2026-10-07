@@ -60,7 +60,7 @@ struct LyricVocalFrame {
         func animationInterval(rate: Double) -> Double {
             // One display clock for the entire row. Dense vocals need more
             // samples; a held note or line sheen can use half the frame rate.
-            highlightsWords && shortestWordDuration / max(0.01, rate) < 0.25 ? 1.0 / 60 : 1.0 / 30
+            hasExactTiming || highlightsWords && shortestWordDuration / max(0.01, rate) < 0.25 ? 1.0 / 60 : 1.0 / 30
         }
     }
 

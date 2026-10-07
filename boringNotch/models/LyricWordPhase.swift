@@ -5,6 +5,22 @@ import Foundation
 struct LyricWordPhase {
     let isActive: Bool
     let progress: Double
+    let duration: Double
+
+    /// A soft light front and a narrow pearl crest. The endpoints match the
+    /// stationary ink, so finishing a word cannot flash its last letter.
+    func shimmerOpacity(at location: Double, feather: Double = 0.16) -> Double {
+        guard isActive else { return progress >= 1 ? 0.94 : 0.60 }
+        guard duration > 0.18 else { return 0.94 }
+        let feather = min(0.28, max(0.08, feather))
+        let edge = 0.03 + (1 + feather * 1.5) * progress
+        let blend = min(1, max(0, (edge - location + feather) / (2 * feather)))
+        let revealed = 0.60 + 0.34 * blend * blend * (3 - 2 * blend)
+        let distance = abs(location - edge) / feather
+        let crest = max(0, 1 - distance * distance)
+        let settle = min(1, max(0, (1 - progress) / 0.12))
+        return min(1, max(revealed, 0.60 + 0.40 * crest * settle))
+    }
 
     /// Put a readable light edge on the first glyph at onset. The old 0...1.18
     /// edge spent the beginning of each word entering from outside its text.
@@ -27,7 +43,7 @@ struct LyricWordPhase {
     }
 
     init(word: LyricLine.Word, elapsed: Double) {
-        let duration = word.end - word.start
+        duration = word.end - word.start
         guard elapsed.isFinite, word.start.isFinite, word.end.isFinite,
               duration.isFinite, duration > 0 else {
             isActive = false

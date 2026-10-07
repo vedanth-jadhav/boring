@@ -11,7 +11,7 @@ trap 'rm -rf "$performance_test_dir"' EXIT
 python3 - "$performance_test_dir" <<'PY'
 from pathlib import Path
 import re, sys
-classes = ['LyricsTimingTests', 'LyricsPrecisionTests', 'LyricsServiceTimingTests', 'PerformanceRegressionTests']
+classes = ['LyricsTimingTests', 'LyricsPrecisionTests', 'LyricsServiceTimingTests', 'SpicyLyricsTests', 'PerformanceRegressionTests']
 sources = []
 runner = ['@main struct PerformanceTestRunner {', ' @MainActor static func main() async throws {',
           '  NSApplication.shared.setActivationPolicy(.prohibited)']
@@ -33,6 +33,9 @@ performance_objects=("$performance_binary_dir/Defaults.build/"*.o)
   -I "$performance_binary_dir/Modules" \
   boringNotch/models/Lyric{Line,Timeline,VocalFrame,WordPhase,PlaybackClock,PhoneticTiming}.swift \
   boringNotch/models/LyricsRomanizer.swift boringNotch/models/RomanizationLexicon.swift boringNotch/managers/LyricsService.swift \
+  boringNotch/models/{LyricAttribution,SpicyLyricsPayload}.swift boringNotch/managers/SpicyLyricsClient.swift \
+  boringNotch/helpers/SpicyLyricsCredential.swift \
+  boringNotch/managers/EnhancedLyricsSettingsModel.swift \
   boringNotch/MediaControllers/MediaAppBundleID.swift boringNotch/helpers/AppleScriptHelper.swift \
   boringNotch/components/LiveActivities/LyricTextLayout.swift boringNotch/extensions/NSImage+Extensions.swift \
   boringNotch/components/Music/MusicVisualizer.swift boringNotch/components/LiveActivities/NotchMusicState.swift \

@@ -45,7 +45,14 @@ struct ExpandedItem {
 final class BoringViewCoordinator: ObservableObject {
     static let shared = BoringViewCoordinator()
 
-    @Published var currentView: NotchViews = .home
+    @Published var currentView: NotchViews = .home {
+        didSet {
+            if openLastTabByDefault {
+                lastSelectedTab = currentView.rawValue
+            }
+        }
+    }
+    @AppStorage("lastSelectedTab") private var lastSelectedTab: String = NotchViews.home.rawValue
     @Published var helloAnimationRunning: Bool = false
     private var osdEnableTask: Task<Void, Never>?
 
@@ -68,6 +75,7 @@ final class BoringViewCoordinator: ObservableObject {
         didSet {
             if openLastTabByDefault {
                 alwaysShowTabs = true
+                lastSelectedTab = currentView.rawValue
             }
         }
     }
@@ -96,6 +104,12 @@ final class BoringViewCoordinator: ObservableObject {
     private var uiEventCancellable: AnyCancellable?
 
     private init() {
+        currentView = NotchViews.restored(
+            savedTab: lastSelectedTab,
+            rememberLastTab: openLastTabByDefault,
+            shelfEnabled: Defaults[.boringShelf]
+        )
+
         // Perform migration from name-based to UUID-based storage
         if preferredScreenUUID == nil, let legacyName = legacyPreferredScreenName {
             // Try to find screen by name and migrate to UUID

@@ -36,6 +36,8 @@ func XCTUnwrap<T>(_ value: T?, file: StaticString = #file, line: UInt = #line) t
 }
 
 extension Defaults.Keys {
+    static let enableLyrics = Key<Bool>("enableLyrics", default: true)
+    static let enableEnhancedLyrics = Key<Bool>("enableEnhancedLyrics", default: false)
     static let realtimeAudioWaveform = Key<Bool>("performanceTests.realtimeAudioWaveform", default: false)
 }
 protocol AudioCaptureLevelsConsumer: AnyObject {

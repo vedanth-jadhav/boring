@@ -15,12 +15,32 @@ This repository is the source for **Boring Notch Octave**. It is an independentl
 The project starts from [TheBoredTeam/boring.notch](https://github.com/TheBoredTeam/boring.notch), based on upstream commit [`fb26431`](https://github.com/TheBoredTeam/boring.notch/commit/fb2643121741c6ba6102d5ef2b2c7a787f26fad1). [Compare this version with that upstream baseline](https://github.com/vedanth-jadhav/boring/compare/fb2643121741c6ba6102d5ef2b2c7a787f26fad1...main). The main additions and changes in this version are:
 
 - **Octave in Brave:** a browser extension and native bridge connect Octave playback, controls, audio visualization, and lyrics to the notch.
-- **Karaoke lyrics:** word-level timing and highlighting, vocal-aware lyric layout, and romanization for Hindi, Punjabi, and Urdu. Hindi, Hinglish, Punjabi, and Urdu lyrics with line-only timestamps get syllable-weighted estimated word timing.
+- **Karaoke lyrics:** Spicy Lyrics supplies lyric text and precise word/syllable timestamps when available, with local caching and a smooth shimmer over stationary text. Vocal-aware layout and romanization support Hindi, Punjabi, and Urdu. Sources with only line timestamps retain the existing estimates and phrase sheen.
+- **Shelf tools:** file actions for screenshots, image and PDF conversion, compression, and sharing.
+- **Codex usage:** a local view of Codex token history and plan allowance.
 - **Focus sessions:** a notch-based focus timer with duration controls and session state.
 - **Liquid glass and notch polish:** updated glass treatments, music activity layouts, lyric rendering, and interaction details, with fallbacks for older macOS versions.
 - **Local app delivery:** a separate app identity, signing setup, Brave bridge installer, and scripts that build, install, launch, and verify this customized app.
 
 See [LOCAL_OCTAVE.md](LOCAL_OCTAVE.md) for the Octave bridge and local setup, and [Scripts/PerformanceFindings.md](Scripts/PerformanceFindings.md) for implementation notes and verification details.
+
+### Enable enhanced lyrics
+
+Enhanced lyrics are optional and off by default for new users. Each user supplies their own Spicy Lyrics API key; the project does not bundle a shared key.
+
+1. Open **Settings → Media → Enhanced lyrics**.
+2. Sign in to the [Spicy Lyrics developer dashboard](https://developers.spicylyrics.org/dashboard/applications) and create an application for Boring Notch.
+3. Copy your secret key, paste it into the secure field, and choose **Save & Enable**. The app checks the key before saving it in macOS Keychain.
+
+The toggle changes the current song immediately. Turning it off restores regular lyrics and keeps the saved key; **Remove key** deletes the local credential. Original lyric text and precise word timings are fetched together when available, with cached results for repeat plays. Existing users who already configured a personal key keep their previous opt-in.
+
+### Data and privacy
+
+The Codex tab reads `auth.json` and session history from the selected Codex folder (by default `~/.codex`). Session history is scanned and cached locally. To show plan allowance, the app uses the Codex CLI access token from `auth.json` to request usage data from `chatgpt.com`; it also downloads public model pricing from `developers.openai.com` to estimate equivalent API costs. These requests begin when the Codex tab is opened. The app does not upload session history.
+
+Enhanced lyrics sends the current track's title, artist, album, and duration to MusicBrainz to identify a recording. When a matching track is found, it requests lyrics from Spicy Lyrics using the user's own saved key. Results are cached locally. The key is stored in macOS Keychain and is sent only to `api.spicylyrics.org`.
+
+Screenshot retention is off by default. When enabled in **Settings → Shelf**, newly captured screenshots are copied into the app's persistent Shelf library on this Mac. Turning the setting off stops future imports; it does not remove screenshots already saved there. The library can be opened from Shelf settings.
 
 ## Download
 

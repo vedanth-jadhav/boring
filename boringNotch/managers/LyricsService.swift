@@ -6,6 +6,8 @@
 //
 
 import AppKit
+import Combine
+import Defaults
 import Foundation
 
 /// Service responsible for fetching and parsing lyrics for the currently playing track.
@@ -19,6 +21,7 @@ final class LyricsService: ObservableObject {
     @Published private(set) var timedLyrics: [LyricLine] = [] {
         didSet { timeline = LyricTimeline(lines: timedLyrics); cachedFrame = nil }
     }
+    @Published private(set) var attribution: LyricAttribution?
     private var timeline = LyricTimeline(lines: [])
     private var cachedFrame: (bucket: Int, duration: Double, frame: LyricVocalFrame)?
 
@@ -28,25 +31,56 @@ final class LyricsService: ObservableObject {
         let plain: String
         let synced: [(time: Double, text: String)]
         let timed: [LyricLine]
-        init(plain: String, synced: [(time: Double, text: String)], timed: [LyricLine]? = nil) {
+        let attribution: LyricAttribution?
+        var precision: Int { timed.contains { !$0.words.isEmpty } ? 2 : (timed.isEmpty ? 0 : 1) }
+        init(plain: String, synced: [(time: Double, text: String)], timed: [LyricLine]? = nil,
+             attribution: LyricAttribution? = nil) {
             self.plain = plain
             self.synced = synced
             self.timed = timed ?? synced.map { LyricLine(start: $0.time, end: nil, text: $0.text) }
+            self.attribution = attribution
         }
     }
     private let lyricsCache = NSCache<NSString, LyricsEntry>()
+    private let enhancedCache = NSCache<NSString, LyricsEntry>()
     private var currentFetchTask: Task<Void, Never>?
+    private var spicyFetchTask: Task<Void, Never>?
     private var activeCacheKey: String?
+    private var activeUseEnhanced = false
+    private struct FetchContext {
+        let bundleIdentifier: String?
+        let title: String
+        let artist: String
+        let preferProvider: Bool
+        let album: String
+        let duration: Double
+    }
+    private var fetchContext: FetchContext?
+    private var configurationTask: Task<Void, Never>?
+    private var preferenceSubscription: AnyCancellable?
 
-    private init() {}
+    private init() {
+        lyricsCache.countLimit = 80
+        enhancedCache.countLimit = 80
+        // An existing personal key represents the earlier explicit opt-in.
+        // Fresh installations use the public project's disabled default.
+        if UserDefaults.standard.object(forKey: "enableEnhancedLyrics") == nil, SpicyLyricsCredential.load() != nil {
+            Defaults[.enableEnhancedLyrics] = true
+        }
+        preferenceSubscription = Defaults.publisher(.enableEnhancedLyrics, options: []).sink { [weak self] _ in
+            Task { @MainActor in self?.configurationChanged() }
+        }
+    }
 
     // MARK: - Public API
 
     /// Fetches lyrics for the given track, preferring native Apple Music lyrics when available.
     func fetchLyrics(bundleIdentifier: String?, title: String, artist: String,
-                     preferProvider: Bool = false) async {
+                     preferProvider: Bool = false, album: String = "", duration: Double = 0,
+                     useEnhancedLyrics: Bool? = nil) async {
         // Cancel any pending fetch
         currentFetchTask?.cancel()
+        spicyFetchTask?.cancel()
 
         guard !title.isEmpty else {
             clearLyrics()
@@ -56,11 +90,22 @@ final class LyricsService: ObservableObject {
         // Check cache first
         let cacheKey = cacheKey(title: title, artist: artist)
         activeCacheKey = cacheKey
-        if let cached = lyricsCache.object(forKey: cacheKey as NSString) {
-            currentLyrics = cached.plain
-            syncedLyrics = cached.synced
-            timedLyrics = cached.timed
-            isFetchingLyrics = false
+        activeUseEnhanced = useEnhancedLyrics ?? Defaults[.enableEnhancedLyrics]
+        fetchContext = FetchContext(bundleIdentifier: bundleIdentifier, title: title, artist: artist,
+                                    preferProvider: preferProvider, album: album, duration: duration)
+        // A provider's quick line response must not cancel the richer import.
+        // Lyrics from Spicy replace both text and timestamps as one payload.
+        if activeUseEnhanced {
+          spicyFetchTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+            let payload = await SpicyLyricsClient.shared.fetch(title: title, artist: artist, album: album, duration: duration)
+            guard !Task.isCancelled, self.activeUseEnhanced, self.activeCacheKey == cacheKey, let payload else { return }
+            self.setProviderLyrics(payload.lines, plainLyrics: payload.plain, title: title, artist: artist,
+                                   attribution: payload.attribution)
+          }
+        }
+        if let cached = preferredEntry(for: cacheKey) {
+            apply(cached)
             return
         }
 
@@ -68,6 +113,7 @@ final class LyricsService: ObservableObject {
         currentLyrics = ""
         syncedLyrics = []
         timedLyrics = []
+        attribution = nil
 
         let task = Task { [weak self] in
             guard let self = self else { return }
@@ -120,17 +166,56 @@ final class LyricsService: ObservableObject {
 
     /// Clears all lyrics data.
     func clearLyrics() {
+        configurationTask?.cancel()
+        configurationTask = nil
+        fetchContext = nil
         currentFetchTask?.cancel()
         currentFetchTask = nil
+        spicyFetchTask?.cancel()
+        spicyFetchTask = nil
         activeCacheKey = nil
+        activeUseEnhanced = false
         currentLyrics = ""
         syncedLyrics = []
         timedLyrics = []
+        attribution = nil
+        isFetchingLyrics = false
+    }
+
+    /// Toggle/key changes refresh the current song, without waiting for a skip.
+    func configurationChanged() {
+        configurationTask?.cancel()
+        currentFetchTask?.cancel()
+        spicyFetchTask?.cancel()
+        activeUseEnhanced = Defaults[.enableEnhancedLyrics]
+        guard let context = fetchContext else { return }
+        if let key = activeCacheKey, let cached = preferredEntry(for: key) { apply(cached) }
+        configurationTask = Task { [weak self] in
+            await SpicyLyricsClient.shared.reloadCredential()
+            guard !Task.isCancelled, let self,
+                  self.activeCacheKey == self.cacheKey(title: context.title, artist: context.artist) else { return }
+            await self.fetchLyrics(bundleIdentifier: context.bundleIdentifier, title: context.title, artist: context.artist,
+                                  preferProvider: context.preferProvider, album: context.album, duration: context.duration)
+        }
+    }
+
+    private func preferredEntry(for key: String) -> LyricsEntry? {
+        let regular = lyricsCache.object(forKey: key as NSString)
+        guard activeUseEnhanced, let enhanced = enhancedCache.object(forKey: key as NSString) else { return regular }
+        return enhanced.precision >= (regular?.precision ?? -1) ? enhanced : regular
+    }
+
+    private func apply(_ entry: LyricsEntry) {
+        if currentLyrics != entry.plain { currentLyrics = entry.plain }
+        syncedLyrics = entry.synced
+        if timedLyrics != entry.timed { timedLyrics = entry.timed }
+        if attribution != entry.attribution { attribution = entry.attribution }
         isFetchingLyrics = false
     }
 
     /// Retain Octave's absolute word timestamps, including instrumental gaps.
-    func setProviderLyrics(_ lines: [LyricLine], plainLyrics: String = "", title: String, artist: String) {
+    func setProviderLyrics(_ lines: [LyricLine], plainLyrics: String = "", title: String, artist: String,
+                           attribution sourceAttribution: LyricAttribution? = nil) {
         let key = cacheKey(title: title, artist: artist)
         let sorted = lines.filter { $0.start.isFinite && $0.start >= 0 }.map { line in
             let words = line.words.filter {
@@ -142,22 +227,17 @@ final class LyricsService: ObservableObject {
             return LyricLine(start: line.start, end: line.end.flatMap { $0.isFinite && $0 > line.start ? $0 : nil },
                              text: line.text, words: words.count == line.words.count ? words : [], isBackground: line.isBackground)
         }.sorted { $0.start < $1.start }
-        let plain = sorted.isEmpty ? plainLyrics : sorted.map(\.text).joined(separator: "\n")
+        let plain = sourceAttribution != nil || sorted.isEmpty ? plainLyrics : sorted.map(\.text).joined(separator: "\n")
         guard !plain.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        // A later line-only response must not discard a richer cached alignment.
-        if let cached = lyricsCache.object(forKey: key as NSString),
-           cached.timed.contains(where: { !$0.words.isEmpty }),
-           !sorted.contains(where: { !$0.words.isEmpty }) { return }
         let synced = sorted.map { (time: $0.start, text: $0.text) }
-        lyricsCache.setObject(LyricsEntry(plain: plain, synced: synced, timed: sorted), forKey: key as NSString)
-        guard activeCacheKey == key else { return }
-        guard timedLyrics != sorted || currentLyrics != plain else { return }
+        let entry = LyricsEntry(plain: plain, synced: synced, timed: sorted, attribution: sourceAttribution)
+        let cache = sourceAttribution == nil ? lyricsCache : enhancedCache
+        if let cached = cache.object(forKey: key as NSString), cached.precision > entry.precision { return }
+        cache.setObject(entry, forKey: key as NSString)
+        guard activeCacheKey == key, let selected = preferredEntry(for: key) else { return }
         currentFetchTask?.cancel()
         currentFetchTask = nil
-        currentLyrics = plain
-        syncedLyrics = synced
-        timedLyrics = sorted
-        isFetchingLyrics = false
+        apply(selected)
     }
 
     /// Return every concurrent vocal, preserving simultaneous line timestamps.
@@ -167,6 +247,10 @@ final class LyricsService: ObservableObject {
 
     func displayedLines(at elapsed: Double, duration: Double) -> [LyricTimeline.Entry] {
         timeline.displayed(at: elapsed, duration: duration)
+    }
+
+    func displayedRow(at elapsed: Double) -> LyricVocalFrame.Row? {
+        timeline.displayedPrimary(at: elapsed)?.vocalRows.primary
     }
 
     func vocalFrame(at elapsed: Double, duration: Double) -> LyricVocalFrame {
@@ -186,10 +270,12 @@ final class LyricsService: ObservableObject {
     /// The shared row clock paints words. The song-level view only needs row
     /// and silence boundaries, unless Reduce Motion disables that local clock.
     func displayDates(anchorPosition: Double, anchorDate: Date, rate: Double, playing: Bool,
-                      wordBoundaries: Bool = true) -> [Date] {
+                      wordBoundaries: Bool = true, singleRow: Bool = false) -> [Date] {
         guard playing, rate > 0 else { return [.now] }
         let now = Date()
-        let boundaries = wordBoundaries ? timeline.displayBoundaries : timeline.rowDisplayBoundaries
+        let boundaries = singleRow
+            ? (wordBoundaries ? timeline.singleRowWordBoundaries : timeline.singleRowBoundaries)
+            : (wordBoundaries ? timeline.displayBoundaries : timeline.rowDisplayBoundaries)
         return [now] + boundaries.map {
             // Date/Double conversion can round just before the source stamp.
             // One microsecond prevents evaluating the previous word at an end.

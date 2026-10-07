@@ -174,6 +174,14 @@ static func present(
 
     menu.addItem(NSMenuItem.separator())
     addMenuItem(title: Strings.share, contextAction: .share)
+    if !selectedFileURLs.isEmpty {
+        for tool in [ShelfTool.whatsapp, .compress, .convert, .preview] {
+            let entry = NSMenuItem(title: tool.title + (tool.children.isEmpty ? "" : "…"), action: nil, keyEquivalent: "")
+            entry.representedObject = "shelfTool:" + tool.rawValue
+            entry.image = NSImage(systemSymbolName: tool.symbol, accessibilityDescription: tool.title)
+            menu.addItem(entry)
+        }
+    }
 
     // Add image processing options for image files grouped under "Image Actions"
     let imageURLs = selectedFileURLs.filter { ImageProcessingService.shared.isImageFile($0) }
@@ -209,7 +217,7 @@ static func present(
 
     // Add compression option for files/folders (single or multiple)
     if !selectedFileURLs.isEmpty {
-        let compressItem = NSMenuItem(title: Strings.compress, action: nil, keyEquivalent: "")
+        let compressItem = NSMenuItem(title: "Create ZIP Archive", action: nil, keyEquivalent: "")
         compressItem.representedObject = ContextMenuAction.compress.rawValue
         menu.addItem(compressItem)
     }
@@ -222,8 +230,6 @@ static func present(
     if !selectedFileURLs.isEmpty {
         let copyPathItem = NSMenuItem(title: Strings.copyPath, action: nil, keyEquivalent: "")
         copyPathItem.representedObject = ContextMenuAction.copyPath.rawValue
-        copyPathItem.isAlternate = true
-        copyPathItem.keyEquivalentModifierMask = [.option]
         menu.addItem(copyPathItem)
     }
 
@@ -348,6 +354,13 @@ private final class MenuActionTarget: NSObject {
                         Log.shelf.error("❌ Failed to open with application: \(error.localizedDescription)")
                     }
             }
+            return
+        }
+
+        if let value = sender.representedObject as? String, value.hasPrefix("shelfTool:"),
+           let tool = ShelfTool(rawValue: String(value.dropFirst("shelfTool:".count))) {
+            let files = ShelfSelectionModel.shared.selectedItems(in: ShelfStateViewModel.shared.items).compactMap(\.fileURL)
+            ShelfToolService.shared.run(tool, urls: files, from: view)
             return
         }
 

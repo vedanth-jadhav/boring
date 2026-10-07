@@ -50,6 +50,22 @@ struct ShelfSettingsView: View {
             }
 
             Section {
+                Defaults.Toggle(key: .shakeShelfTools) {
+                    Text("Shake a dragged file to open quick actions")
+                }
+                Defaults.Toggle(key: .keepScreenshotsOnShelf) {
+                    Text("Keep new screenshots in Shelf")
+                }
+                Text("Screenshots are copied into a lasting library. Open them in Preview for native markup. Compression makes smaller image, PDF, and video copies.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Open Screenshot Library") {
+                    ScreenshotShelfService.shared.revealLibrary()
+                }
+            } header: {
+                Text("File tools & screenshots")
+            }
+
+            Section {
                 Picker("Quick Share Service", selection: $quickShareProvider) {
                     ForEach(quickShareService.availableProviders, id: \.id) { provider in
                         HStack {

@@ -67,6 +67,10 @@ struct DynamicNotchApp: App {
 
     var body: some Scene {
         MenuBarExtra("boring.notch", systemImage: "sparkle", isInserted: $showMenuBarIcon) {
+            Button("Codex usage", systemImage: "terminal") {
+                appDelegate.showCodexUsage()
+            }
+            Divider()
             Button("Settings") {
                 DispatchQueue.main.async {
                     SettingsWindowController.shared.showWindow()
@@ -129,11 +133,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow? { windowManager.window }
     var vm: BoringViewModel { windowManager.primaryViewModel }
 
+    func showCodexUsage() {
+        let model = viewModels[coordinator.selectedScreenUUID] ?? vm
+        withAnimation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : StandardAnimations.focusTab) {
+            coordinator.currentView = .codex
+            model.open()
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        CursorShelfController.shared.stop()
+        ScreenshotShelfService.shared.stop()
         if isMigratingLegacyBundle { return }
 
         // Flush debounced shelf persistence to avoid losing recent changes
@@ -165,15 +179,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     func onScreenLocked(_ notification: Notification) {
+        CursorShelfController.shared.stop()
+        ScreenshotShelfService.shared.stop()
         windowManager.screenLocked()
     }
 
     @MainActor
     func onScreenUnlocked(_ notification: Notification) {
+        CursorShelfController.shared.start()
+        ScreenshotShelfService.shared.start()
         windowManager.screenUnlocked()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        CursorShelfController.shared.start()
+        ScreenshotShelfService.shared.start()
         _ = FocusSessionManager.shared
         do {
             if let migratedURL = try LegacyAppBundleMigration.migrateIfNeeded(at: Bundle.main.bundleURL) {

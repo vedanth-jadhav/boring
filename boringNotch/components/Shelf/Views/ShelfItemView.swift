@@ -80,7 +80,7 @@ struct ShelfItemView: View {
             textView
         }
         .frame(width: 105)
-        .padding(.vertical, 10)
+        .padding(.vertical, 6)
         .padding(.horizontal, 5)
         .background(backgroundView)
         .contentShape(Rectangle())
@@ -105,7 +105,7 @@ struct ShelfItemView: View {
     private var iconView: some View {
         Image(nsImage: viewModel.thumbnail ?? item.icon)
             .resizable().scaledToFit()
-            .frame(width: 56, height: 56)
+            .frame(width: 48, height: 48)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
     }

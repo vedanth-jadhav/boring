@@ -397,7 +397,7 @@ final class LyricsPrecisionTests: XCTestCase {
         }
     }
 
-    func testDenseVocalsGetDisplaySamplesWithoutSpeedingUpHeldNotes() {
+    func testExactVocalsGetSmoothCanvasSamplesWithoutChangingTheirClock() {
         let rap = LyricVocalFrame.Row(id: "rap", words: [.init(text: "quick", start: 0, end: 0.05)],
             isBackground: false, hasExactTiming: true)
         let held = LyricVocalFrame.Row(id: "held", words: [.init(text: "ohh", start: 0, end: 2)],
@@ -405,8 +405,8 @@ final class LyricsPrecisionTests: XCTestCase {
         let spoken = LyricVocalFrame.Row(id: "spoken", words: [.init(text: "word", start: 0, end: 0.4)],
             isBackground: false, hasExactTiming: true)
         XCTAssertEqual(rap.animationInterval(rate: 1), 1.0 / 60)
-        XCTAssertEqual(held.animationInterval(rate: 1), 1.0 / 30)
-        XCTAssertEqual(spoken.animationInterval(rate: 1), 1.0 / 30)
+        XCTAssertEqual(held.animationInterval(rate: 1), 1.0 / 60)
+        XCTAssertEqual(spoken.animationInterval(rate: 1), 1.0 / 60)
         XCTAssertEqual(spoken.animationInterval(rate: 2), 1.0 / 60)
     }
 

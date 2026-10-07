@@ -32,17 +32,10 @@ struct KaraokeLyricLineView: View {
         let anchor = row.anchor(at: position)
         let visibleRange = layout.pageForWord.indices.contains(anchor) ? layout.pageForWord[anchor] : words.indices
 
-        return ZStack(alignment: .leading) {
-            Group {
+        return Group {
                 if row.highlightsWords {
-                    HStack(spacing: layout.spacing) {
-                        ForEach(visibleRange, id: \.self) { index in
-                            HighlightedLyricWord(text: layout.text[index], pointSize: layout.pointSizes[index],
-                                                 word: words[index], elapsed: position,
-                                                 hasExactTiming: row.hasExactTiming, reduceMotion: reduceMotion)
-                        }
-                    }
-                    .fixedSize(horizontal: true, vertical: false)
+                    LyricCanvasView(layout: layout, words: words, visibleRange: visibleRange, position: position,
+                                    exactTiming: row.hasExactTiming, reduceMotion: reduceMotion, pointSize: pointSize)
                 } else {
                     // LRC can identify the sung line, not individual words.
                     // Illuminate that whole phrase on its actual line window.
@@ -53,9 +46,6 @@ struct KaraokeLyricLineView: View {
                         .minimumScaleFactor(0.1)
                         .frame(width: max(0, width), alignment: .leading)
                 }
-            }
-            .id(visibleRange.lowerBound)
-            .transition(.identity)
         }
         // Show the new page fully at its timestamp. Animation remains within
         // active glyphs, rather than delaying the visibility of their text.

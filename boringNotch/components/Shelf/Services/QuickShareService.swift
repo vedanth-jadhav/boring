@@ -120,6 +120,7 @@ final class QuickShareService: ObservableObject {
 
     @MainActor
     func icon(for providerId: String, size: CGFloat) -> NSImage? {
+        if providerId == "WhatsApp" { return resizedIcon(WhatsAppShareService.icon, to: size) }
         if let cachedIcon = cachedIcons[providerId] {
             return resizedIcon(cachedIcon, to: size)
         }
@@ -206,6 +207,10 @@ final class QuickShareService: ObservableObject {
             providers.append(.systemShareMenu)
         }
 
+        if !providers.contains(where: { $0.id == "WhatsApp" }) {
+            providers.insert(WhatsAppShareService.provider, at: min(1, providers.count))
+        }
+
         availableProviders = providers
         warmApplicationIconCacheIfNeeded()
     }
@@ -248,6 +253,10 @@ final class QuickShareService: ObservableObject {
     // MARK: - Sharing
     @MainActor
     func shareFilesOrText(_ items: [Any], using provider: QuickShareProvider, from view: NSView?) async {
+        if provider.id == "WhatsApp" {
+            await WhatsAppShareService.share(items)
+            return
+        }
         let fileURLs = items.compactMap { $0 as? URL }.filter { $0.isFileURL }
         // Stop any previous sharing access
         stopSharingAccessingURLs()

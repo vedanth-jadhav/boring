@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 /// Romanisation and glyph measurement happen once, rather than on every
 /// display refresh. Timing remains attached to the original source words.
@@ -10,6 +11,14 @@ final class LyricTextLayout {
     let pages: [Range<Int>]
     let pageForWord: [Range<Int>]
     let accessibilityText: String
+    let offsets: [CGFloat]
+    private let glyphTemplates: [Text]
+
+    /// GraphicsContext.ResolvedText belongs to its drawing context. Cache the
+    /// text templates and measurements, then resolve within each paint pass.
+    func glyph(at index: Int, in context: GraphicsContext) -> GraphicsContext.ResolvedText {
+        context.resolve(glyphTemplates[index])
+    }
     private static let cache: NSCache<NSString, LyricTextLayout> = {
         let cache = NSCache<NSString, LyricTextLayout>()
         cache.countLimit = 240
@@ -45,6 +54,9 @@ final class LyricTextLayout {
         }
         pointSizes = fitted.map { $0.0 }
         widths = fitted.map { $0.1 }
+        glyphTemplates = zip(text, fitted).map { token, metrics in
+            Text(token).font(.system(size: metrics.0, weight: .medium))
+        }
         let gap = pointSize * 0.28
         spacing = gap
         var ranges: [Range<Int>] = []
@@ -60,6 +72,15 @@ final class LyricTextLayout {
         }
         if start < widths.count { ranges.append(start..<widths.count) }
         pages = ranges
+        var positions = Array(repeating: CGFloat.zero, count: widths.count)
+        for page in ranges {
+            var x: CGFloat = 0
+            for index in page {
+                positions[index] = x
+                x += widths[index] + gap
+            }
+        }
+        offsets = positions
         pageForWord = ranges.flatMap { range in Array(repeating: range, count: range.count) }
         accessibilityText = text.joined(separator: " ")
     }

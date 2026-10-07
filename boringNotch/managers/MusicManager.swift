@@ -539,7 +539,8 @@ final class MusicManager: ObservableObject {
             }
 
             // Fetch lyrics on content change
-            self.fetchLyricsIfAvailable(bundleIdentifier: state.bundleIdentifier, title: state.title, artist: state.artist)
+            self.fetchLyricsIfAvailable(bundleIdentifier: state.bundleIdentifier, title: state.title, artist: state.artist,
+                                        album: state.album, duration: state.duration)
         }
 
         let timeChanged = state.currentTime != self.elapsedTime
@@ -634,7 +635,8 @@ final class MusicManager: ObservableObject {
     }
 
     // MARK: - Lyrics
-    private func fetchLyricsIfAvailable(bundleIdentifier: String?, title: String, artist: String) {
+    private func fetchLyricsIfAvailable(bundleIdentifier: String?, title: String, artist: String,
+                                       album: String = "", duration: Double = 0) {
         guard Defaults[.enableLyrics], !title.isEmpty else {
             Task { @MainActor in
                 lyricsService.clearLyrics()
@@ -645,7 +647,7 @@ final class MusicManager: ObservableObject {
         Task { @MainActor in
             await lyricsService.fetchLyrics(
                 bundleIdentifier: bundleIdentifier, title: title, artist: artist,
-                preferProvider: effectiveMediaController == .octave
+                preferProvider: effectiveMediaController == .octave, album: album, duration: duration
             )
         }
     }

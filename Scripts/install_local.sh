@@ -1,6 +1,21 @@
 #!/bin/bash
 # Install one signed local build, retire stale copies, and verify what launches.
 set -euo pipefail
+# Multiple local coding sessions share this app and its staging directory.
+# Keep packaging, signing, archiving, and launch verification in one lock.
+if [[ "${BORING_LOCAL_INSTALL_LOCKED:-}" != "1" ]]; then
+  exec python3 - "$0" "$@" <<'PY'
+import fcntl
+import os
+import subprocess
+import sys
+
+with open('/tmp/boring-notch-local-install.lock', 'a') as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    environment = dict(os.environ, BORING_LOCAL_INSTALL_LOCKED='1')
+    raise SystemExit(subprocess.call(['bash', *sys.argv[1:]], env=environment))
+PY
+fi
 cd "$(dirname "$0")/.."
 if [[ "${1:-release}" != "--skip-build" ]]; then
   bash Scripts/package_local.sh "${1:-release}"

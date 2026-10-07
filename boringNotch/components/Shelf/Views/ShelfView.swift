@@ -13,6 +13,7 @@ struct ShelfView: View {
     let dropInteraction: DropInteractionState
     let animation: Animation?
     @StateObject var shelfState = ShelfStateViewModel.shared
+    @StateObject private var tools = ShelfToolService.shared
 
     private let spacing: CGFloat = 8
 
@@ -25,8 +26,24 @@ struct ShelfView: View {
 
         ShelfQuickLookHost { quickLookService in
             HStack(spacing: 12) {
-                FileShareView(dropInteraction: dropInteraction)
-                    .aspectRatio(1, contentMode: .fit)
+                VStack(spacing: 4) {
+                    ForEach([ShelfTool.whatsapp, .compress, .convert, .copyPath]) { tool in
+                        ShelfToolButton(tool: tool)
+                    }
+                    HStack(spacing: 5) {
+                        Button("Capture", systemImage: "camera.viewfinder") {
+                            ScreenshotShelfService.shared.capture()
+                        }
+                        .font(.system(size: 10, weight: .semibold))
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity).frame(height: 23)
+                        .modifier(ShelfGlass(radius: 11))
+                        .help("Open the macOS screenshot toolbar (⌘⇧5)")
+                        FileShareView(dropInteraction: dropInteraction)
+                            .frame(width: 28, height: 23)
+                    }
+                }
+                .frame(width: 122)
                 panel(quickLookService: quickLookService)
                     .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $interaction.dragDetectorTargeting) { providers in
                         handleDrop(providers: providers)
@@ -44,17 +61,16 @@ struct ShelfView: View {
 
     private func panel(quickLookService: QuickLookService) -> some View {
         RoundedRectangle(cornerRadius: 16)
-            .stroke(
-                dropInteraction.dragDetectorTargeting
-                    ? Color.accentColor.opacity(0.9)
-                    : Color.white.opacity(0.1),
-                style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [10])
-            )
+            .fill(dropInteraction.dragDetectorTargeting ? Color.cyan.opacity(0.14) : Color.white.opacity(0.045))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(dropInteraction.dragDetectorTargeting ? Color.cyan.opacity(0.75) : .white.opacity(0.12), lineWidth: 1)
+            }
             .overlay {
                 ZStack {
                     ShelfBackgroundInteractionView()
                     content(quickLookService: quickLookService)
-                        .padding()
+                        .padding(8)
                 }
             }
             .transaction { transaction in
@@ -67,20 +83,25 @@ struct ShelfView: View {
 
         return Group {
             if shelfState.isEmpty {
-                VStack(spacing: 10) {
+                VStack(spacing: 8) {
                     Image(systemName: "tray.and.arrow.down")
                         .symbolVariant(.fill)
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.white, .gray)
+                        .foregroundStyle(dropInteraction.dragDetectorTargeting ? .cyan : .white.opacity(0.85))
                         .imageScale(.large)
 
-                    Text("Drop files here")
-                        .foregroundStyle(.gray)
-                        .font(.system(.title3, design: .rounded))
-                        .fontWeight(.medium)
+                    Text(dropInteraction.dragDetectorTargeting ? "Release to save" : "Save to Shelf")
+                        .foregroundStyle(.white)
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Drop files & screenshots here")
+                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.7))
+                    Text(tools.notice)
+                        .font(.system(size: 10)).foregroundStyle(.white.opacity(0.65))
+                        .lineLimit(2).multilineTextAlignment(.center)
                 }
             } else {
-                ScrollView(.horizontal) {
+                VStack(alignment: .leading, spacing: 3) {
+                    ScrollView(.horizontal) {
                     LazyHStack(spacing: spacing) {
                         ForEach(displayedItems) { item in
                             ShelfItemView(
@@ -95,6 +116,13 @@ struct ShelfView: View {
                 .scrollIndicators(.never)
                 .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $interaction.dragDetectorTargeting) { providers in
                     handleDrop(providers: providers)
+                }
+                    HStack(spacing: 6) {
+                        if tools.isWorking { ProgressView().controlSize(.mini) }
+                        Text(tools.notice).font(.system(size: 10)).foregroundStyle(.white.opacity(0.72)).lineLimit(1)
+                        Spacer(minLength: 0)
+                        Text("\(shelfState.items.count)").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+                    }
                 }
             }
         }

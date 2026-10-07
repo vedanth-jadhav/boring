@@ -34,75 +34,27 @@ struct FileShareView: View {
                 Task { await handleDrop(providers) }
                 return true
             }
-            .onTapGesture {
-                Task {
-                    await handleClick()
-                }
-            }
     }
 
     private var dropArea: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(
-                    LinearGradient(colors: [Color.black.opacity(0.35), Color.black.opacity(0.20)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(
-                            dropInteraction.dropZoneTargeting
-                                ? Color.accentColor.opacity(0.9)
-                                : Color.white.opacity(0.1),
-                            style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [10])
-                        )
-                )
-                .shadow(color: Color.black.opacity(0.6), radius: 6, x: 0, y: 2)
-
-            // Content
-            VStack(spacing: 5) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(
-                            dropInteraction.dropZoneTargeting ? 0.11 : 0.09
-                        ))
-                        .frame(width: 55, height: 55)
-                    Group {
-                        if let icon = quickShare.icon(for: selectedProvider.id, size: 34) {
-                            Image(nsImage: icon)
-                                .resizable().scaledToFit()
-                        } else {
-                            Image(systemName: "square.and.arrow.up")
-                        }
-                    }
-                    .frame(width: 34, height: 34)
-                        .foregroundStyle(
-                            dropInteraction.dropZoneTargeting ? Color.accentColor : Color.gray
-                        )
-                        .scaleEffect(
-                            dropInteraction.dropZoneTargeting ? 1.06 : 1.0
-                        )
-                        .animation(.spring(response: 0.36, dampingFraction: 0.7), value: dropInteraction.dropZoneTargeting)
+        Button {
+            Task { await handleClick() }
+        } label: {
+            Group {
+                if isProcessing || quickShare.isPickerOpen {
+                    ProgressView().controlSize(.mini)
+                } else if let icon = quickShare.icon(for: selectedProvider.id, size: 18) {
+                    Image(nsImage: icon).resizable().scaledToFit().frame(width: 18, height: 18)
+                } else {
+                    Image(systemName: "square.and.arrow.up").font(.system(size: 14))
                 }
-
-                Text(selectedProvider.id)
-                    .font(.system(.headline, design: .rounded))
-                    .foregroundColor(.white.opacity(0.8))
-                    .multilineTextAlignment(.center)
             }
-            .padding(18)
-
-            // Loading overlay
-            if isProcessing || quickShare.isPickerOpen {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.black.opacity(0.3))
-                    .overlay(
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(0.8)
-                    )
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .modifier(ShelfGlass(active: dropInteraction.dropZoneTargeting, tint: .cyan, radius: 10))
         }
-        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .buttonStyle(.plain)
+        .accessibilityLabel("Share with \(selectedProvider.id)")
+        .help("Share with \(selectedProvider.id) · choose a provider in Shelf settings")
     }
 
     // MARK: - Actions

@@ -73,6 +73,7 @@ struct ShelfDropService {
     }
 
     private static func createBookmark(for url: URL) -> Data? {
-        return (try? Bookmark(url: url))?.data
+        guard let stableURL = try? ShelfFileLibrary.preserveIfEphemeral(url) else { return nil }
+        return (try? Bookmark(url: stableURL))?.data
     }
 }

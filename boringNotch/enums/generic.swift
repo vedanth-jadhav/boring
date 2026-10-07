@@ -18,10 +18,28 @@ enum NotchState {
     case open
 }
 
-enum NotchViews {
+enum NotchViews: String, CaseIterable {
     case home
     case shelf
     case timer
+    case codex
+
+    static func restored(savedTab: String, rememberLastTab: Bool, shelfEnabled: Bool) -> Self {
+        guard rememberLastTab, let tab = Self(rawValue: savedTab) else { return .home }
+        return tab == .shelf && !shelfEnabled ? .home : tab
+    }
+
+    func nextOpenTab(
+        rememberLastTab: Bool,
+        shelfEnabled: Bool,
+        shelfHasItems: Bool,
+        openShelfByDefault: Bool
+    ) -> Self {
+        if rememberLastTab {
+            return self == .shelf && !shelfEnabled ? .home : self
+        }
+        return shelfEnabled && shelfHasItems && openShelfByDefault ? .shelf : .home
+    }
 }
 
 enum DownloadIndicatorStyle: String, Defaults.Serializable {

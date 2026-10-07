@@ -120,6 +120,11 @@ final class SharingLifecycleDelegate: NSObject, NSSharingServiceDelegate, NSShar
 
 	// MARK: - NSSharingServicePickerDelegate
 
+	func sharingServicePicker(_ picker: NSSharingServicePicker, sharingServicesForItems items: [Any], proposedSharingServices services: [NSSharingService]) -> [NSSharingService] {
+		guard !services.contains(where: { $0.title.localizedCaseInsensitiveContains("whatsapp") }) else { return services }
+		return MainActor.assumeIsolated { [WhatsAppShareService.customService(items: items)] + services }
+	}
+
 	func sharingServicePicker(_ sharingServicePicker: NSSharingServicePicker, didChoose service: NSSharingService?) {
 		if service == nil {
 			if pickerActive && !serviceInProgress {

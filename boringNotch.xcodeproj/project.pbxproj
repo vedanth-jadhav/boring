@@ -7,6 +7,38 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		550BC82B5F4A1CE15A2F9417 /* CodexAllowanceTrack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D5BB098A39BA22A78CBDA45 /* CodexAllowanceTrack.swift */; };
+		934E67E53A17CD4CF0055210 /* CodexModelDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3214CFB170B14046994D0C0 /* CodexModelDetail.swift */; };
+		4857FDC907044BBBB2F0BD12 /* ShelfToolFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1EAD41BAE46471F86DFED50 /* ShelfToolFeedback.swift */; };
+		87AB153BCE5BAC51530B071C /* CodexModelRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD33D261247B39DB194407B0 /* CodexModelRow.swift */; };
+		9F84F8E7621F095E70FCE8A4 /* CodexQuotaLane.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6FD3BF1D59244E019F07BDF /* CodexQuotaLane.swift */; };
+		8CAC94603602F09774319F22 /* CodexUsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64725ACD16DF2FC5B9B3B733 /* CodexUsageView.swift */; };
+		20F34FD39C6CF4C7CB22D489 /* CodexLogScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1837D0FE91DAB6D5C14494D2 /* CodexLogScanner.swift */; };
+		94A71772FC05911785D89A42 /* CodexRateCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD9F13753061372B2CB6A73 /* CodexRateCatalog.swift */; };
+		F9F0394849660DEED59B18CB /* CodexUsageClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF50CFB14F975234879205AB /* CodexUsageClient.swift */; };
+		54A57EA41FFB58B5F266B7EA /* CodexUsageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 460872DB75E9EAAB9D201128 /* CodexUsageStore.swift */; };
+		1C32835020C082131DCF3945 /* CodexModelUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8165BE34863666DC7B048359 /* CodexModelUsage.swift */; };
+		506626EF71036B7AAD6C994D /* CodexQuotaSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500F52753BD2DD47D505E1BF /* CodexQuotaSnapshot.swift */; };
+		5EC2D566FE0C3B2DE439E3AF /* CodexTokenTotals.swift in Sources */ = {isa = PBXBuildFile; fileRef = E05F50D12E48D260B0AA6EB4 /* CodexTokenTotals.swift */; };
+		F3C10000000000000000000E /* EnhancedLyricsSettingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C10000000000000000000D /* EnhancedLyricsSettingsModel.swift */; };
+		F5AE00000000000000000002 /* ShelfTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE00000000000000000001 /* ShelfTool.swift */; };
+		F5AE00000000000000000004 /* CursorShelfController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE00000000000000000003 /* CursorShelfController.swift */; };
+		F5AE00000000000000000006 /* ScreenshotShelfService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE00000000000000000005 /* ScreenshotShelfService.swift */; };
+		F5AE00000000000000000008 /* ShelfFileLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE00000000000000000007 /* ShelfFileLibrary.swift */; };
+		F5AE0000000000000000000A /* ShelfMediaProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE00000000000000000009 /* ShelfMediaProcessor.swift */; };
+		F5AE0000000000000000000C /* ShelfToolOptionsController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE0000000000000000000B /* ShelfToolOptionsController.swift */; };
+		F5AE0000000000000000000E /* ShelfToolService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE0000000000000000000D /* ShelfToolService.swift */; };
+		F5AE00000000000000000010 /* WhatsAppShareService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE0000000000000000000F /* WhatsAppShareService.swift */; };
+		F5AE00000000000000000012 /* CursorShelfModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE00000000000000000011 /* CursorShelfModel.swift */; };
+		F5AE00000000000000000014 /* CursorShelfDropView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE00000000000000000013 /* CursorShelfDropView.swift */; };
+		F5AE00000000000000000016 /* CursorShelfView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE00000000000000000015 /* CursorShelfView.swift */; };
+		F5AE00000000000000000018 /* ShelfGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE00000000000000000017 /* ShelfGlass.swift */; };
+		F5AE0000000000000000001A /* ShelfToolButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE00000000000000000019 /* ShelfToolButton.swift */; };
+		F5AE0000000000000000001C /* ShelfToolOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5AE0000000000000000001B /* ShelfToolOptionsView.swift */; };
+		F3C100000000000000000008 /* LyricAttribution.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C100000000000000000007 /* LyricAttribution.swift */; };
+		F3C100000000000000000006 /* SpicyLyricsPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C100000000000000000005 /* SpicyLyricsPayload.swift */; };
+		F3C100000000000000000004 /* SpicyLyricsCredential.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C100000000000000000003 /* SpicyLyricsCredential.swift */; };
+		F3C100000000000000000002 /* SpicyLyricsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C100000000000000000001 /* SpicyLyricsClient.swift */; };
 		F2A1C0000000000000000014 /* LyricPhoneticTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000013 /* LyricPhoneticTiming.swift */; };
 		F2A1C0000000000000000010 /* RomanizationLexicon.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C000000000000000000F /* RomanizationLexicon.swift */; };
 		F2A1C0000000000000000012 /* Romanization in Resources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000011 /* Romanization */; };
@@ -209,6 +241,38 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0D5BB098A39BA22A78CBDA45 /* CodexAllowanceTrack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Codex/CodexAllowanceTrack.swift; sourceTree = SOURCE_ROOT; };
+		B3214CFB170B14046994D0C0 /* CodexModelDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Codex/CodexModelDetail.swift; sourceTree = SOURCE_ROOT; };
+		B1EAD41BAE46471F86DFED50 /* ShelfToolFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Services/ShelfToolFeedback.swift; sourceTree = SOURCE_ROOT; };
+		CD33D261247B39DB194407B0 /* CodexModelRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Codex/CodexModelRow.swift; sourceTree = SOURCE_ROOT; };
+		C6FD3BF1D59244E019F07BDF /* CodexQuotaLane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Codex/CodexQuotaLane.swift; sourceTree = SOURCE_ROOT; };
+		64725ACD16DF2FC5B9B3B733 /* CodexUsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Codex/CodexUsageView.swift; sourceTree = SOURCE_ROOT; };
+		1837D0FE91DAB6D5C14494D2 /* CodexLogScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/managers/Codex/CodexLogScanner.swift; sourceTree = SOURCE_ROOT; };
+		AAD9F13753061372B2CB6A73 /* CodexRateCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/managers/Codex/CodexRateCatalog.swift; sourceTree = SOURCE_ROOT; };
+		DF50CFB14F975234879205AB /* CodexUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/managers/Codex/CodexUsageClient.swift; sourceTree = SOURCE_ROOT; };
+		460872DB75E9EAAB9D201128 /* CodexUsageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/managers/Codex/CodexUsageStore.swift; sourceTree = SOURCE_ROOT; };
+		8165BE34863666DC7B048359 /* CodexModelUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/models/Codex/CodexModelUsage.swift; sourceTree = SOURCE_ROOT; };
+		500F52753BD2DD47D505E1BF /* CodexQuotaSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/models/Codex/CodexQuotaSnapshot.swift; sourceTree = SOURCE_ROOT; };
+		E05F50D12E48D260B0AA6EB4 /* CodexTokenTotals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/models/Codex/CodexTokenTotals.swift; sourceTree = SOURCE_ROOT; };
+		F3C10000000000000000000D /* EnhancedLyricsSettingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnhancedLyricsSettingsModel.swift; sourceTree = "<group>"; };
+		F5AE00000000000000000001 /* ShelfTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Models/ShelfTool.swift; sourceTree = SOURCE_ROOT; };
+		F5AE00000000000000000003 /* CursorShelfController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Services/CursorShelfController.swift; sourceTree = SOURCE_ROOT; };
+		F5AE00000000000000000005 /* ScreenshotShelfService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Services/ScreenshotShelfService.swift; sourceTree = SOURCE_ROOT; };
+		F5AE00000000000000000007 /* ShelfFileLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Services/ShelfFileLibrary.swift; sourceTree = SOURCE_ROOT; };
+		F5AE00000000000000000009 /* ShelfMediaProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Services/ShelfMediaProcessor.swift; sourceTree = SOURCE_ROOT; };
+		F5AE0000000000000000000B /* ShelfToolOptionsController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Services/ShelfToolOptionsController.swift; sourceTree = SOURCE_ROOT; };
+		F5AE0000000000000000000D /* ShelfToolService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Services/ShelfToolService.swift; sourceTree = SOURCE_ROOT; };
+		F5AE0000000000000000000F /* WhatsAppShareService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Services/WhatsAppShareService.swift; sourceTree = SOURCE_ROOT; };
+		F5AE00000000000000000011 /* CursorShelfModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/ViewModels/CursorShelfModel.swift; sourceTree = SOURCE_ROOT; };
+		F5AE00000000000000000013 /* CursorShelfDropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Views/CursorShelfDropView.swift; sourceTree = SOURCE_ROOT; };
+		F5AE00000000000000000015 /* CursorShelfView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Views/CursorShelfView.swift; sourceTree = SOURCE_ROOT; };
+		F5AE00000000000000000017 /* ShelfGlass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Views/ShelfGlass.swift; sourceTree = SOURCE_ROOT; };
+		F5AE00000000000000000019 /* ShelfToolButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Views/ShelfToolButton.swift; sourceTree = SOURCE_ROOT; };
+		F5AE0000000000000000001B /* ShelfToolOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Views/ShelfToolOptionsView.swift; sourceTree = SOURCE_ROOT; };
+		F3C100000000000000000007 /* LyricAttribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricAttribution.swift; sourceTree = "<group>"; };
+		F3C100000000000000000005 /* SpicyLyricsPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpicyLyricsPayload.swift; sourceTree = "<group>"; };
+		F3C100000000000000000003 /* SpicyLyricsCredential.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpicyLyricsCredential.swift; sourceTree = "<group>"; };
+		F3C100000000000000000001 /* SpicyLyricsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpicyLyricsClient.swift; sourceTree = "<group>"; };
 		F2A1C0000000000000000013 /* LyricPhoneticTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricPhoneticTiming.swift; sourceTree = "<group>"; };
 		F2A1C000000000000000000F /* RomanizationLexicon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomanizationLexicon.swift; sourceTree = "<group>"; };
 		F2A1C0000000000000000011 /* Romanization */ = {isa = PBXFileReference; lastKnownFileType = folder; path = boringNotch/Resources/Romanization; sourceTree = SOURCE_ROOT; };
@@ -459,6 +523,21 @@
 			children = (
 				11F747CD2EC75CEA00F841DB /* DragPreviewView.swift */,
 				110029292E8691B400035A57 /* FileShareView.swift */,
+				B1EAD41BAE46471F86DFED50 /* ShelfToolFeedback.swift */,
+				F5AE00000000000000000001 /* ShelfTool.swift */,
+				F5AE00000000000000000003 /* CursorShelfController.swift */,
+				F5AE00000000000000000005 /* ScreenshotShelfService.swift */,
+				F5AE00000000000000000007 /* ShelfFileLibrary.swift */,
+				F5AE00000000000000000009 /* ShelfMediaProcessor.swift */,
+				F5AE0000000000000000000B /* ShelfToolOptionsController.swift */,
+				F5AE0000000000000000000D /* ShelfToolService.swift */,
+				F5AE0000000000000000000F /* WhatsAppShareService.swift */,
+				F5AE00000000000000000011 /* CursorShelfModel.swift */,
+				F5AE00000000000000000013 /* CursorShelfDropView.swift */,
+				F5AE00000000000000000015 /* CursorShelfView.swift */,
+				F5AE00000000000000000017 /* ShelfGlass.swift */,
+				F5AE00000000000000000019 /* ShelfToolButton.swift */,
+				F5AE0000000000000000001B /* ShelfToolOptionsView.swift */,
 				1113ABC32E80E27000EC13B2 /* ShelfItemView.swift */,
 				A1F000022F00000100000001 /* ShelfItemInteractionView.swift */,
 				E49B58CAC648403F864E6D78 /* ShelfContextMenu.swift */,
@@ -571,6 +650,7 @@
 		14288DD92C6E015000B9F80C /* helpers */ = {
 			isa = PBXGroup;
 			children = (
+				F3C100000000000000000003 /* SpicyLyricsCredential.swift */,
 				C02700000000000000000004 /* ViewState.swift */,
 				118EBE242E92DCCB00D54B5A /* AssociatedObject.swift */,
 				11A45C782E34E63100CEB175 /* MediaChecker.swift */,
@@ -629,6 +709,8 @@
 		147163B52C5D804B0068B555 /* managers */ = {
 			isa = PBXGroup;
 			children = (
+				F3C100000000000000000001 /* SpicyLyricsClient.swift */,
+				F3C10000000000000000000D /* EnhancedLyricsSettingsModel.swift */,
 				11DB26652EDD0BE1001EA0CF /* LyricsService.swift */,
 				11D58EA12E760AE100FA8377 /* ImageService.swift */,
 				F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */,
@@ -685,6 +767,18 @@
 		14CEF4142C5CAED300855D72 /* boringNotch */ = {
 			isa = PBXGroup;
 			children = (
+				0D5BB098A39BA22A78CBDA45 /* CodexAllowanceTrack.swift */,
+				B3214CFB170B14046994D0C0 /* CodexModelDetail.swift */,
+				CD33D261247B39DB194407B0 /* CodexModelRow.swift */,
+				C6FD3BF1D59244E019F07BDF /* CodexQuotaLane.swift */,
+				64725ACD16DF2FC5B9B3B733 /* CodexUsageView.swift */,
+				1837D0FE91DAB6D5C14494D2 /* CodexLogScanner.swift */,
+				AAD9F13753061372B2CB6A73 /* CodexRateCatalog.swift */,
+				DF50CFB14F975234879205AB /* CodexUsageClient.swift */,
+				460872DB75E9EAAB9D201128 /* CodexUsageStore.swift */,
+				8165BE34863666DC7B048359 /* CodexModelUsage.swift */,
+				500F52753BD2DD47D505E1BF /* CodexQuotaSnapshot.swift */,
+				E05F50D12E48D260B0AA6EB4 /* CodexTokenTotals.swift */,
 				F0C050000000000000000005 /* CenteredRulerSnapping.swift */,
 				F0C050000000000000000003 /* FocusActivityMetrics.swift */,
 				F0C050000000000000000001 /* FocusDurationSelection.swift */,
@@ -767,6 +861,8 @@
 		14D570C72C5F38760011E668 /* models */ = {
 			isa = PBXGroup;
 			children = (
+				F3C100000000000000000007 /* LyricAttribution.swift */,
+				F3C100000000000000000005 /* SpicyLyricsPayload.swift */,
 				F2A1C000000000000000000B /* LyricVocalFrame.swift */,
 				F2A1C0000000000000000009 /* LyricTimeline.swift */,
 				F2A1C0000000000000000007 /* LyricPlaybackClock.swift */,
@@ -1059,6 +1155,18 @@
 				7863D2CA65AEB99CE4E32230 /* FocusControlSurface.swift in Sources */,
 				AD4DFB18AFFBC4BEB64B4B81 /* FocusHaptics.swift in Sources */,
 				FC0C9DA827C5062CC7A48CB2 /* FocusTimerView.swift in Sources */,
+				87AB153BCE5BAC51530B071C /* CodexModelRow.swift in Sources */,
+				9F84F8E7621F095E70FCE8A4 /* CodexQuotaLane.swift in Sources */,
+				8CAC94603602F09774319F22 /* CodexUsageView.swift in Sources */,
+				550BC82B5F4A1CE15A2F9417 /* CodexAllowanceTrack.swift in Sources */,
+				934E67E53A17CD4CF0055210 /* CodexModelDetail.swift in Sources */,
+				20F34FD39C6CF4C7CB22D489 /* CodexLogScanner.swift in Sources */,
+				94A71772FC05911785D89A42 /* CodexRateCatalog.swift in Sources */,
+				F9F0394849660DEED59B18CB /* CodexUsageClient.swift in Sources */,
+				54A57EA41FFB58B5F266B7EA /* CodexUsageStore.swift in Sources */,
+				1C32835020C082131DCF3945 /* CodexModelUsage.swift in Sources */,
+				506626EF71036B7AAD6C994D /* CodexQuotaSnapshot.swift in Sources */,
+				5EC2D566FE0C3B2DE439E3AF /* CodexTokenTotals.swift in Sources */,
 				EE462559C284380876E8B8CF /* RulerMouseDrag.swift in Sources */,
 				D058D122B9FEB4078CF21BD3 /* CaffeineManager.swift in Sources */,
 				809D1FCB23BD0F1AF2483C6D /* FocusPowerManaging.swift in Sources */,
@@ -1070,6 +1178,21 @@
 				14C08BB92C8DE4B1000F8AA0 /* BoringCalendar.swift in Sources */,
 				5955950D2E900ED800C66711 /* ApplicationRelauncher.swift in Sources */,
 				1100292A2E8691B400035A57 /* FileShareView.swift in Sources */,
+				4857FDC907044BBBB2F0BD12 /* ShelfToolFeedback.swift in Sources */,
+				F5AE00000000000000000002 /* ShelfTool.swift in Sources */,
+				F5AE00000000000000000004 /* CursorShelfController.swift in Sources */,
+				F5AE00000000000000000006 /* ScreenshotShelfService.swift in Sources */,
+				F5AE00000000000000000008 /* ShelfFileLibrary.swift in Sources */,
+				F5AE0000000000000000000A /* ShelfMediaProcessor.swift in Sources */,
+				F5AE0000000000000000000C /* ShelfToolOptionsController.swift in Sources */,
+				F5AE0000000000000000000E /* ShelfToolService.swift in Sources */,
+				F5AE00000000000000000010 /* WhatsAppShareService.swift in Sources */,
+				F5AE00000000000000000012 /* CursorShelfModel.swift in Sources */,
+				F5AE00000000000000000014 /* CursorShelfDropView.swift in Sources */,
+				F5AE00000000000000000016 /* CursorShelfView.swift in Sources */,
+				F5AE00000000000000000018 /* ShelfGlass.swift in Sources */,
+				F5AE0000000000000000001A /* ShelfToolButton.swift in Sources */,
+				F5AE0000000000000000001C /* ShelfToolOptionsView.swift in Sources */,
 				147163982C5D35B70068B555 /* MusicVisualizer.swift in Sources */,
 				11CC44A22CEE614100C7244B /* BoringViewCoordinator.swift in Sources */,
 				B186543C2C6F49AE000B926A /* ShortcutConstants.swift in Sources */,
@@ -1103,6 +1226,11 @@
 				AFA82F21304B406590337862 /* ShelfContextMenu.swift in Sources */,
 				1113ABC62E80E27000EC13B2 /* ShelfPersistenceService.swift in Sources */,
 				11DB26662EDD0BE1001EA0CF /* LyricsService.swift in Sources */,
+				F3C100000000000000000008 /* LyricAttribution.swift in Sources */,
+				F3C100000000000000000006 /* SpicyLyricsPayload.swift in Sources */,
+				F3C100000000000000000004 /* SpicyLyricsCredential.swift in Sources */,
+				F3C100000000000000000002 /* SpicyLyricsClient.swift in Sources */,
+				F3C10000000000000000000E /* EnhancedLyricsSettingsModel.swift in Sources */,
 				F2A1C000000000000000000C /* LyricVocalFrame.swift in Sources */,
 				F2A1C000000000000000000A /* LyricTimeline.swift in Sources */,
 				F2A1C0000000000000000008 /* LyricPlaybackClock.swift in Sources */,

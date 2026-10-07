@@ -1,8 +1,8 @@
 import Foundation
 
 /// All timestamps are absolute seconds on the media element's clock.
-struct LyricLine: Equatable {
-    struct Word: Equatable {
+struct LyricLine: Equatable, Codable {
+    struct Word: Equatable, Codable {
         let text: String
         let start: Double
         let end: Double

@@ -124,6 +124,8 @@ struct MediaSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            EnhancedLyricsSettingsView()
+
             Section {
                 Defaults.Toggle(key: .coloredSpectrogram) {
                     Text("Colored spectrogram")
@@ -170,7 +172,8 @@ struct MediaSettingsView: View {
                         bundleIdentifier: musicManager.bundleIdentifier,
                         title: musicManager.songTitle,
                         artist: musicManager.artistName,
-                        preferProvider: musicManager.effectiveMediaController == .octave
+                        preferProvider: musicManager.effectiveMediaController == .octave,
+                        album: musicManager.album, duration: musicManager.songDuration
                     )
                 }
             } else {

@@ -128,6 +128,7 @@ struct ContentView: View {
     /// controlled by its own internal padding instead, which is the honest
     /// lever anyway.
     private var openNotchHeight: CGFloat? {
+        if coordinator.currentView == .codex { return 306 }
         if coordinator.currentView == .timer { return focus.isActive ? 190 : 230 }
         return compactMode ? nil : vm.notchSize.height
     }
@@ -138,7 +139,7 @@ struct ContentView: View {
     /// header spans the full notch width.
     private var showsHeader: Bool {
         vm.notchState == .open
-            && (!compactMode || coordinator.currentView == .timer)
+            && (!compactMode || coordinator.currentView == .timer || coordinator.currentView == .codex)
     }
 
     private enum ClosedNotchContent: Equatable {
@@ -257,7 +258,7 @@ struct ContentView: View {
                         .padding(.horizontal, vm.notchState == .open ? 12 : max(0, cornerRadiusInsets.closed.bottom - topCornerRadius))
                         .padding(.bottom, vm.notchState == .open ? 12 : 0)
                 }
-                    .frame(width: vm.notchState == .open ? (compactMode && coordinator.currentView != .timer ? 336 + 24 + 2 * openedInsets.top : vm.notchSize.width) : nil, alignment: .top)
+                    .frame(width: vm.notchState == .open ? (compactMode && coordinator.currentView != .timer && coordinator.currentView != .codex ? 336 + 24 + 2 * openedInsets.top : vm.notchSize.width) : nil, alignment: .top)
                     .clipShape(currentNotchShape)
                           .overlay(alignment: .top) {
                               displayClosedNotchHeight.isZero && vm.notchState == .closed ? nil
@@ -338,13 +339,13 @@ struct ContentView: View {
                                 handleDownGesture(translation: translation, phase: phase)
                             }
                     }
-                    .conditionalModifier(closeGestureEnabled && enableGestures && coordinator.currentView != .timer && !shouldDisplayNowPlayingFallbackNotice) { view in
+                    .conditionalModifier(closeGestureEnabled && enableGestures && coordinator.currentView != .timer && coordinator.currentView != .codex && !shouldDisplayNowPlayingFallbackNotice) { view in
                         view
                             .panGesture(direction: .up) { translation, phase in
                                 handleUpGesture(translation: translation, phase: phase)
                             }
                     }
-                    .conditionalModifier(enableHorizontalMediaGestures && enableGestures && (vm.notchState == .closed || coordinator.currentView != .timer) && !shouldDisplayNowPlayingFallbackNotice) { view in
+                    .conditionalModifier(enableHorizontalMediaGestures && enableGestures && (vm.notchState == .closed || (coordinator.currentView != .timer && coordinator.currentView != .codex)) && !shouldDisplayNowPlayingFallbackNotice) { view in
                         view
                             .panGesture(direction: .left) { translation, phase in
                                 handleNextTrackGesture(translation: translation, phase: phase)
@@ -572,7 +573,7 @@ struct ContentView: View {
             if vm.notchState == .open {
                 VStack {
                     // An explicitly opened workspace retains its own content.
-                    if compactMode && coordinator.currentView != .timer {
+                    if compactMode && coordinator.currentView != .timer && coordinator.currentView != .codex {
                         // Player only — no tab switching, so currentView is
                         // ignored here rather than offering a shelf the
                         // compact layout has no room (or tab bar) for.
@@ -601,6 +602,9 @@ struct ContentView: View {
                             .transition(tabTransition)
                         case .timer:
                             FocusTimerView()
+                                .transition(tabTransition)
+                        case .codex:
+                            CodexUsageView()
                                 .transition(tabTransition)
                         case .shelf:
                             ShelfView(

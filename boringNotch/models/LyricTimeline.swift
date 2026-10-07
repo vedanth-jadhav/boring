@@ -18,6 +18,8 @@ struct LyricTimeline {
     private let frameBoundaries: [Double]
     private let prefixEnds: [Double]
     private let displayEntries: [Entry]
+    let singleRowBoundaries: [Double]
+    let singleRowWordBoundaries: [Double]
     var rowDisplayBoundaries: [Double] { frameBoundaries }
 
     init(lines: [LyricLine]) {
@@ -59,6 +61,14 @@ struct LyricTimeline {
         let readable = prepared.filter { !$0.words.isEmpty }
         let lead = readable.filter { $0.words.contains { !$0.isBackground } }
         displayEntries = lead.isEmpty ? readable : lead
+        singleRowBoundaries = Array(Set(displayEntries.flatMap { entry in
+            [entry.line.start, entry.end] + (entry.vocalRows.primary?.activityIntervals.flatMap {
+                [$0.lowerBound, $0.upperBound]
+            } ?? [])
+        }.filter { $0.isFinite && $0 >= 0 })).sorted()
+        singleRowWordBoundaries = Array(Set(displayEntries.flatMap { entry in
+            [entry.line.start, entry.end] + (entry.vocalRows.primary?.words.flatMap { [$0.start, $0.end] } ?? [])
+        }.filter { $0.isFinite && $0 >= 0 })).sorted()
         hasConcurrentVocals = concurrent
         var maximum = -Double.infinity
         prefixEnds = prepared.map { maximum = max(maximum, $0.end); return maximum }
@@ -77,7 +87,13 @@ struct LyricTimeline {
     /// Reading and singing have different lifetimes: retain the current lead
     /// through silence, but never extend any word's highlight timestamps.
     func displayed(at elapsed: Double, duration: Double) -> [Entry] {
-        guard elapsed.isFinite, elapsed >= 0, !displayEntries.isEmpty else { return [] }
+        guard let primary = displayedPrimary(at: elapsed) else { return [] }
+        return [primary] + active(at: elapsed, duration: duration).reversed().filter { $0.index != primary.index }
+    }
+
+    /// A single stable reading lane, independent of overlapping backing vocals.
+    func displayedPrimary(at elapsed: Double) -> Entry? {
+        guard elapsed.isFinite, elapsed >= 0, !displayEntries.isEmpty else { return nil }
         var low = 0
         var high = displayEntries.count
         while low < high {
@@ -86,8 +102,7 @@ struct LyricTimeline {
         }
         // Preview the first phrase during the intro, then hold each phrase
         // until its successor starts. Empty LRC markers cannot blank the row.
-        let primary = displayEntries[max(0, low - 1)]
-        return [primary] + active(at: elapsed, duration: duration).reversed().filter { $0.index != primary.index }
+        return displayEntries[max(0, low - 1)]
     }
 
     func active(at elapsed: Double, duration: Double) -> [Entry] {

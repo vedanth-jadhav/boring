@@ -456,6 +456,7 @@ extension Defaults.Keys {
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
     #endif
     static let romanizeLyrics = Key<Bool>("romanizeLyrics", default: true)
+    static let enableEnhancedLyrics = Key<Bool>("enableEnhancedLyrics", default: false)
     static let showRemainingTime = Key<Bool>("showRemainingTime", default: false)
     static let musicControlSlots = Key<[MusicControlButton]>(
         "musicControlSlots",
@@ -503,6 +504,8 @@ extension Defaults.Keys {
 
     // MARK: Shelf
     static let boringShelf = Key<Bool>("boringShelf", default: true)
+    static let shakeShelfTools = Key<Bool>("shakeShelfTools", default: true)
+    static let keepScreenshotsOnShelf = Key<Bool>("keepScreenshotsOnShelf", default: false)
     static let openShelfByDefault = Key<Bool>("openShelfByDefault", default: true)
     static let shelfTapToOpen = Key<Bool>("shelfTapToOpen", default: true)
     static let quickShareProvider = Key<String>("quickShareProvider", default: QuickShareProvider.defaultProvider.id)

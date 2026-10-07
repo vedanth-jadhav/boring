@@ -18,17 +18,19 @@ struct TabModel: Identifiable {
 let tabs = [
     TabModel(label: "Home", icon: "house.fill", view: .home),
     TabModel(label: "Shelf", icon: "tray.fill", view: .shelf),
-    TabModel(label: "Timer", icon: "timer", view: .timer)
+    TabModel(label: "Timer", icon: "timer", view: .timer),
+    TabModel(label: "Codex usage", icon: "terminal", view: .codex)
 ]
 
 struct TabSelectionView: View {
     @ObservedObject var coordinator = BoringViewCoordinator.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace var animation
     var body: some View {
         HStack(spacing: 0) {
             ForEach(tabs.filter { $0.view != .shelf || Defaults[.boringShelf] }) { tab in
                     TabButton(label: tab.label, icon: tab.icon, selected: coordinator.currentView == tab.view) {
-                        withAnimation(StandardAnimations.focusTab) {
+                        withAnimation(reduceMotion ? nil : StandardAnimations.focusTab) {
                             coordinator.currentView = tab.view
                         }
                     }
