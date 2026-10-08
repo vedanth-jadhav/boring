@@ -8,9 +8,9 @@ This independently maintained macOS fork builds on [TheBoredTeam’s Boring Notc
 
 ## See it in action
 
-[![▶ Watch the Boring Notch Octave demo](assets/boring-notch-octave-demo.jpg)](assets/boring-notch-octave-demo.mp4)
+[![Watch the Boring Notch Octave demo](assets/boring-notch-octave-demo.gif)](assets/boring-notch-octave-demo.mp4)
 
-[Click the preview to watch the full 30-second demo at the recording’s original resolution and frame rate.](assets/boring-notch-octave-demo.mp4)
+[The preview plays automatically at 24 fps. Click it to watch the full 30-second MP4 at the recording’s original resolution and frame rate.](assets/boring-notch-octave-demo.mp4)
 
 ## Features
 
