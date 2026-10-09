@@ -6,6 +6,8 @@ This independently maintained macOS fork builds on [TheBoredTeam’s Boring Notc
 
 **[Download for macOS](https://github.com/vedanth-jadhav/boring/releases/latest)** · [Install guide](RELEASE_INSTALL.md) · [Brave + Octave setup](LOCAL_OCTAVE.md)
 
+**Windows edition:** an Electron desktop island with a native Windows helper for PCs without a notch, with feature-based onboarding and Windows system integrations. [Download the Windows release](https://github.com/vedanth-jadhav/boring/releases/tag/windows-v1.0.0) · [Setup and build instructions](windows/README.md). The macOS download above is for macOS only.
+
 ## See it in action
 
 [![Watch the Boring Notch Octave demo](assets/boring-notch-octave-demo.gif)](assets/boring-notch-octave-demo.mp4)

@@ -53,3 +53,13 @@ build/
 *.ipa
 *.xcarchive
 *.dSYM
+
+# Windows desktop build outputs
+windows/**/bin/
+windows/**/obj/
+windows/artifacts/
+windows/TestResults/
+windows/electron/node_modules/
+windows/electron/qa-output/
+.impeccable/review/
+.agents/skills/impeccable/

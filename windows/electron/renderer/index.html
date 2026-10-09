@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Boring Notch Octave</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <svg class="definitions" aria-hidden="true">
+      <defs>
+        <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#000" />
+          <stop offset=".58" stop-color="#000" stop-opacity=".96" />
+          <stop offset="1" stop-color="#080e18" stop-opacity=".68" />
+        </linearGradient>
+        <linearGradient id="solid" x1="0" y1="0" x2="0" y2="1">
+          <stop stop-color="#050505" />
+          <stop offset="1" stop-color="#050505" />
+        </linearGradient>
+      </defs>
+    </svg>
+    <div id="canvas">
+      <svg id="surface" aria-hidden="true">
+        <path id="silhouette" fill="url(#glass)"></path>
+      </svg>
+      <div id="shell">
+        <div id="compact" aria-label="Open island" role="button" tabindex="0">
+          <span id="compact-label"></span
+          ><span id="compact-wave" aria-hidden="true"
+            ><i></i><i></i><i></i><i></i><i></i
+          ></span>
+        </div>
+        <section id="expanded" aria-label="Desktop island" inert>
+          <header>
+            <nav id="tabs" aria-label="Island features"></nav>
+            <div id="header-status"></div>
+            <button
+              id="settings"
+              class="icon-button"
+              aria-label="Settings"
+              title="Settings"
+            ></button>
+          </header>
+          <main id="content"></main>
+          <div id="notice" role="status" aria-live="polite" hidden></div>
+        </section>
+      </div>
+      <div id="artwork-clip">
+        <div id="artwork" aria-hidden="true">
+          <img id="cover" alt="" draggable="false" /><span
+            id="cover-fallback"
+          ></span>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="app.mjs"></script>
+  </body>
+</html>
