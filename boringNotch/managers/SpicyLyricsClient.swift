@@ -31,12 +31,61 @@ actor SpicyLyricsClient {
     private let cacheDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         .appendingPathComponent("local.vedanth.boringnotch.octave/SpicyLyrics", isDirectory: true)
     private var key: String?
-    private var credentialLoaded = false
+    private let credentialReader: @Sendable () -> SpicyLyricsCredential.LoadResult
+    private var credentialLoadTask: Task<SpicyLyricsCredential.LoadResult, Never>?
+    private var credentialFailureIsTemporary = false
+    private var nextCredentialRead = Date.distantPast
+    private var credentialGeneration = 0
     private var failedUntil: [String: Date] = [:]
     private var serverRetry: [String: Date] = [:]
     private var nextMetadataRequest = Date.distantPast
 
-    init(credential: String? = nil) { key = credential; credentialLoaded = credential != nil }
+    init(credential: String? = nil,
+         credentialReader: @escaping @Sendable () -> SpicyLyricsCredential.LoadResult = { SpicyLyricsCredential.loadResult() }) {
+        key = credential
+        self.credentialReader = credentialReader
+    }
+
+    func credentialForRequest() async -> String? {
+        if let key { return key }
+        let generation = credentialGeneration
+        if credentialLoadTask == nil {
+            guard Date() >= nextCredentialRead else { return nil }
+            nextCredentialRead = Date().addingTimeInterval(30)
+            let reader = credentialReader
+            credentialLoadTask = Task.detached(priority: .utility) {
+                var result: SpicyLyricsCredential.LoadResult = .missing
+                for attempt in 0..<3 {
+                    if attempt > 0 {
+                        do { try await Task.sleep(for: .milliseconds(attempt == 1 ? 250 : 1000)) }
+                        catch { return result }
+                    }
+                    guard !Task.isCancelled else { return result }
+                    result = reader()
+                    guard case .inaccessible(let status) = result else { return result }
+                    NSLog("Enhanced lyrics Keychain read unavailable (status %d, authorization required: %@)",
+                          status, SpicyLyricsCredential.requiresAuthorization(status) ? "yes" : "no")
+                    if !SpicyLyricsCredential.isTemporaryFailure(status) { return result }
+                }
+                return result
+            }
+        }
+        guard let task = credentialLoadTask else { return nil }
+        let result = await task.value
+        guard generation == credentialGeneration else { return nil }
+        credentialLoadTask = nil
+        switch result {
+        case .loaded(let value):
+            key = value
+            credentialFailureIsTemporary = false
+            return value
+        case .missing:
+            credentialFailureIsTemporary = false
+        case .inaccessible(let status):
+            credentialFailureIsTemporary = SpicyLyricsCredential.isTemporaryFailure(status)
+        }
+        return nil
+    }
 
     enum KeyValidation: Equatable {
         case valid, invalid, restricted, rateLimited, unavailable
@@ -59,9 +108,13 @@ actor SpicyLyricsClient {
         } catch { return .unavailable }
     }
 
-    func reloadCredential() {
-        key = nil
-        credentialLoaded = false
+    func reloadCredential(credential: String? = nil) {
+        credentialLoadTask?.cancel()
+        credentialLoadTask = nil
+        credentialFailureIsTemporary = false
+        key = credential
+        nextCredentialRead = .distantPast
+        credentialGeneration += 1
         failedUntil.removeAll(keepingCapacity: true)
         serverRetry.removeAll(keepingCapacity: true)
     }
@@ -69,11 +122,14 @@ actor SpicyLyricsClient {
     func fetch(title: String, artist: String, album: String, duration: Double) async -> SpicyLyricsPayload? {
         let duration = duration.isFinite && duration > 0 ? min(duration, 86400) : 0
         guard !title.isEmpty, !artist.isEmpty else { return nil }
-        if !credentialLoaded {
-            key = SpicyLyricsCredential.load()
-            credentialLoaded = true
+        var credential = await credentialForRequest()
+        if credential == nil, credentialFailureIsTemporary {
+            // Retry the current song too; waiting for a future track left lyrics unavailable all session.
+            let delay = max(0, nextCredentialRead.timeIntervalSinceNow)
+            do { try await Task.sleep(for: .seconds(min(30, delay))) } catch { return nil }
+            credential = await credentialForRequest()
         }
-        guard let key else { return nil }
+        guard let key = credential, !Task.isCancelled else { return nil }
         let identity = [normalized(title), normalized(artist), normalized(album), String(Int(duration.rounded()))].joined(separator: "|")
         let cacheURL = cacheDirectory.appendingPathComponent("lyrics-\(digest(identity)).json")
         if let cached: CachedLyrics = read(cacheURL),

@@ -4,8 +4,10 @@ import PackageDescription
 let package = Package(
     name: "BoringNotchLocal",
     platforms: [.macOS(.v14)],
-    products: [.executable(name: "boringNotch", targets: ["boringNotch"])],
+    products: [.executable(name: "boringNotch", targets: ["boringNotch"]),
+        .executable(name: "CaffeineRecovery", targets: ["CaffeineRecovery"])],
     dependencies: [
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.20.0"),
         .package(url: "https://github.com/ChimeHQ/AsyncXPCConnection", exact: "1.3.0"),
         .package(url: "https://github.com/TheBoredTeam/MacroVisionKit", exact: "0.2.0"),
         .package(url: "https://github.com/Lakr233/SkyLightWindow", exact: "1.0.0"),
@@ -19,7 +21,8 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "boringNotch", dependencies: [
+            name: "boringNotch", dependencies: ["CaffeineEngine",
+                .product(name: "SwiftTerm", package: "SwiftTerm"),
                 .product(name: "AsyncXPCConnection", package: "AsyncXPCConnection"),
                 .product(name: "MacroVisionKit", package: "MacroVisionKit"),
                 .product(name: "SkyLightWindow", package: "SkyLightWindow"),
@@ -31,7 +34,7 @@ let package = Package(
                 .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
                 .product(name: "Defaults", package: "Defaults")
             ], path: ".", exclude: [
-                "BoringNotchXPCHelper", "boringNotchTests", "Configuration", "Scripts",
+                "BoringNotchXPCHelper", "boringNotchTests", "Configuration", "Scripts", "ThirdParty", "CaffeineRecovery",
                 "mediaremote-adapter", "octave-brave-extension", "updater", ".github", "build",
                 "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", "LICENSE", "README.md",
                 "SECURITY.md", "THIRD_PARTY_LICENSES", "crowdin.yml", "LOCAL_OCTAVE.md", "dist",
@@ -42,7 +45,9 @@ let package = Package(
             ], sources: ["boringNotch", "Shared"],
             swiftSettings: [.define("BORING_LOCAL_BUILD")]
         ),
-        .executableTarget(name: "BoringNotchXPCHelper", path: ".spm-generated/helper")
+        .executableTarget(name: "BoringNotchXPCHelper", path: ".spm-generated/helper"),
+        .target(name: "CaffeineEngine", path: "ThirdParty/CaffeineEngine", exclude: ["LICENSE", "NOTICE.md", "Package.swift"], swiftSettings: [.swiftLanguageMode(.v6)]),
+        .executableTarget(name: "CaffeineRecovery", dependencies: ["CaffeineEngine"], path: "CaffeineRecovery")
     ],
     swiftLanguageModes: [.v5]
 )

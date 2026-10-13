@@ -6,6 +6,7 @@
 
 import Foundation
 import AppKit
+import SwiftUI
 
 @MainActor
 final class ShelfStateViewModel: ObservableObject {
@@ -15,7 +16,11 @@ final class ShelfStateViewModel: ObservableObject {
         didSet { schedulePersistence() }
     }
 
-    @Published var isLoading: Bool = false
+    @Published private(set) var isLoading: Bool = false
+    @Published private(set) var importNotice: String?
+    private var importTask: Task<Void, Never>?
+    private var pendingImports = 0
+    private let persists: Bool
 
     var isEmpty: Bool { items.isEmpty }
 
@@ -23,11 +28,13 @@ final class ShelfStateViewModel: ObservableObject {
     private var persistenceTask: Task<Void, Never>?
     private let persistenceDelay: Duration = .seconds(1)
 
-    private init() {
-        items = ShelfPersistenceService.shared.load()
+    init(items: [ShelfItem]? = nil, persists: Bool = true) {
+        self.persists = persists
+        self.items = items ?? ShelfPersistenceService.shared.load()
     }
 
     private func schedulePersistence() {
+        guard persists else { return }
         persistenceTask?.cancel()
         persistenceTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: self?.persistenceDelay ?? .seconds(1))
@@ -63,37 +70,50 @@ final class ShelfStateViewModel: ObservableObject {
         }
     }
 
-    func load(_ providers: [NSItemProvider]) {
+    func load(_ providers: [NSItemProvider], animation: Animation? = nil) {
         guard !providers.isEmpty else { return }
+        pendingImports += 1
         isLoading = true
-        Task { [weak self] in
-            let dropped = await ShelfDropService.items(from: providers)
-            await MainActor.run {
-                self?.add(dropped)
-                self?.isLoading = false
+        let previous = importTask
+        // Keep separate drops in arrival order; providers within each drop still import concurrently.
+        importTask = Task { [weak self] in
+            await previous?.value
+            let result = await ShelfDropService.importItems(from: providers)
+            guard let self else { return }
+            let countBefore = self.items.count
+            withAnimation(animation) { self.add(result.items) }
+            let inserted = self.items.count - countBefore
+            if result.failedCount > 0 {
+                self.importNotice = "Couldn't import \(result.failedCount) item(s). \(inserted) added to Shelf."
+            } else if inserted == 0 {
+                self.importNotice = "These items are already on the Shelf."
+            } else {
+                self.importNotice = "Added \(inserted) item(s) to Shelf."
             }
+            self.pendingImports -= 1
+            self.isLoading = self.pendingImports > 0
         }
     }
 
     func cleanupInvalidItems() {
         Task { [weak self] in
-            guard let self else { return }
-            var keep: [ShelfItem] = []
-            for item in self.items {
-                switch item.kind {
-                case .file(let data):
-                    let bookmark = Bookmark(data: data)
-                    if await bookmark.validate() {
-                        keep.append(item)
-                    } else {
-                        item.cleanupStoredData()
-                    }
-                default:
-                    keep.append(item)
-                }
+            await self?.cleanupInvalidItems { item in
+                guard case .file(let data) = item.kind else { return true }
+                return await Bookmark(data: data).validate()
             }
-            await MainActor.run { self.items = keep }
         }
+    }
+
+    func cleanupInvalidItems(validating validate: (ShelfItem) async -> Bool) async {
+        let snapshot = items
+        var invalid: [ShelfItem] = []
+        for item in snapshot {
+            if !(await validate(item)) { invalid.append(item) }
+        }
+        // Bookmark refresh, removal and insertion can all occur while validation is suspended.
+        let stillInvalid = items.filter { invalid.contains($0) }
+        for item in stillInvalid { item.cleanupStoredData() }
+        items.removeAll { stillInvalid.contains($0) }
     }
 
     /// Resolves the file URL for an item and updates the bookmark if stale.

@@ -1,5 +1,34 @@
 # Local Octave build
 
+## Notch terminal
+
+The Terminal tab uses SwiftTerm's native Metal renderer (with a CoreGraphics
+fallback) over the notch's Liquid Glass surface. Settings → Terminal controls
+visibility and the preferred external terminal. Install tmux with
+“brew install tmux” if it is missing.
+
+Shells run in an isolated boring-notch tmux session. Closing the panel,
+switching tabs, disabling the feature, or relaunching the app detaches the
+display without interrupting commands. Exit the shell to end the session;
+Control-C stops the foreground command. Sessions end on logout or reboot.
+The handoff dropdown opens this same session in Terminal, Ghostty, or iTerm2
+and remembers the choice. “Copy attach command” works in any terminal app.
+
+A small green dot appears only in the open notch when TCP listening ports
+belong to this session's process tree. Metadata is checked every five seconds on a background actor;
+the app does not consume or render shell output while the panel is hidden.
+History and renderer buffers are bounded. Ports owned by unrelated sessions
+and Docker's separate daemon are not included.
+
+Startup displays the shell before server inspection completes, and reopening a
+running session skips the startup subprocesses. Notch transitions are shorter
+with no content-arrival delay. Terminal focus has no native ring or duplicate
+window-focus request; its native viewport does not inherit SwiftUI animations.
+
+Run Scripts/test_terminal_session.sh for isolated tmux/server lifecycle
+checks, Scripts/test_terminal_input.sh for unshown native Metal click/focus
+and PTY keyboard checks, and Scripts/test_notch_tabs.sh for tab restoration.
+
 This build is for macOS and Octave in Brave Browser. It uses a separate app ID,
 `local.vedanth.boringnotch.octave`. The local installer maintains one active
 copy in `/Applications/Boring Notch Octave.app`.

@@ -21,47 +21,47 @@ enum StandardAnimations {
 
     /// Controls clear before the surface contracts; artwork has its own layer.
     static var contentDismiss: Animation {
-        configured(.easeOut(duration: 0.10))
+        configured(.easeOut(duration: 0.08))
     }
     /// Content arrives after the expanding surface starts making space.
     static var contentSettle: Animation {
-        configured(.easeOut(duration: 0.20).delay(0.08))
+        configured(.easeOut(duration: 0.12))
     }
     /// Interactive spring for responsive UI (used for notch interactions)
     static var interactive: Animation {
-        configured(.interactiveSpring(response: 0.38, dampingFraction: 0.8, blendDuration: 0))
+        configured(.interactiveSpring(response: 0.24, dampingFraction: 0.94, blendDuration: 0))
     }
 
     /// Tab/session changes settle quickly without disturbing the top anchor.
     static var focusTab: Animation {
-        configured(.interactiveSpring(response: 0.36, dampingFraction: 0.94, blendDuration: 0))
+        configured(.interactiveSpring(response: 0.22, dampingFraction: 0.94, blendDuration: 0))
     }
 
     /// Spring animation for opening the notch
     static var open: Animation {
-        configured(.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0))
+        configured(.spring(response: 0.24, dampingFraction: 0.94, blendDuration: 0))
     }
 
     /// Spring animation for closing the notch
     static var close: Animation {
-        configured(.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0))
+        configured(.spring(response: 0.20, dampingFraction: 1.0, blendDuration: 0))
     }
 
     /// Bouncy spring for playful animations
     @available(macOS 14.0, *)
     static var bouncy: Animation {
-        configured(.spring(.bouncy(duration: 0.4)))
+        configured(.spring(.bouncy(duration: 0.28)))
     }
 
     /// Smooth animation for general transitions
-    static var smooth: Animation { configured(.smooth) }
+    static var smooth: Animation { configured(.smooth(duration: 0.20)) }
 
     /// Closed-state content can resize the same notch surface.
-    static var closedContent: Animation { configured(.smooth(duration: 0.3)) }
+    static var closedContent: Animation { configured(.smooth(duration: 0.18)) }
 
     /// Timing curve fallback for older macOS versions
     static var timingCurve: Animation {
-        configured(.timingCurve(0.16, 1, 0.3, 1, duration: 0.7))
+        configured(.timingCurve(0.16, 1, 0.3, 1, duration: 0.24))
     }
 }
 

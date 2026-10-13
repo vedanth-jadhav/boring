@@ -130,9 +130,15 @@ struct ContentView: View {
     /// as a hover-exit and closed the notch. The compact panel's height is
     /// controlled by its own internal padding instead, which is the honest
     /// lever anyway.
+    @ObservedObject private var focusSelection = FocusSessionManager.shared.selection
+
     private var openNotchHeight: CGFloat? {
+        if coordinator.currentView == .terminal { return 290 }
         if coordinator.currentView == .codex { return 306 }
-        if coordinator.currentView == .timer { return focus.isActive ? 190 : 230 }
+        if coordinator.currentView == .timer {
+            if focusSelection.needsCaffeineSetup(isActive: focus.isActive) { return focus.errorMessage == nil ? maximumFocusPanelHeight - 35 : maximumFocusPanelHeight }
+            return focus.isActive ? 250 : (focusSelection.mode == .caffeine ? 290 : 230)
+        }
         return compactMode ? nil : vm.notchSize.height
     }
 
@@ -142,7 +148,7 @@ struct ContentView: View {
     /// header spans the full notch width.
     private var showsHeader: Bool {
         vm.notchState == .open
-            && (!compactMode || coordinator.currentView == .timer || coordinator.currentView == .codex)
+            && (!compactMode || coordinator.currentView == .timer || coordinator.currentView == .codex || coordinator.currentView == .terminal)
     }
 
     private enum ClosedNotchContent: Equatable {
@@ -269,7 +275,8 @@ struct ContentView: View {
 
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
-                let mainLayout = LiquidGlassSurface(shape: currentNotchShape, expanded: vm.notchState == .open) {
+                let mainLayout = LiquidGlassSurface(shape: currentNotchShape, expanded: vm.notchState == .open,
+                                                   minimumOpacity: coordinator.currentView == .terminal ? 0.55 : 0.10) {
                     NotchLayout()
                         .environmentObject(vm)
                         .environment(\.colorScheme, .dark)
@@ -277,7 +284,9 @@ struct ContentView: View {
                         .padding(.horizontal, vm.notchState == .open ? 12 : max(0, cornerRadiusInsets.closed.bottom - topCornerRadius))
                         .padding(.bottom, vm.notchState == .open ? 12 : 0)
                 }
-                    .frame(width: vm.notchState == .open ? (compactMode && coordinator.currentView != .timer && coordinator.currentView != .codex ? 336 + 24 + 2 * openedInsets.top : vm.notchSize.width) : nil, alignment: .top)
+                    // A floating notch keeps its glass appearance when a text input takes focus.
+                    .environment(\.appearsActive, true)
+                    .frame(width: vm.notchState == .open ? (compactMode && coordinator.currentView != .timer && coordinator.currentView != .codex && coordinator.currentView != .terminal ? 336 + 24 + 2 * openedInsets.top : vm.notchSize.width) : nil, alignment: .top)
                     .clipShape(currentNotchShape)
                           .overlay(alignment: .top) {
                               displayClosedNotchHeight.isZero && vm.notchState == .closed ? nil
@@ -367,19 +376,19 @@ struct ContentView: View {
                             doOpen()
                         }
                     }
-                    .conditionalModifier(enableGestures && !shouldDisplayNowPlayingFallbackNotice) { view in
+                    .conditionalModifier(enableGestures && coordinator.currentView != .terminal && !shouldDisplayNowPlayingFallbackNotice) { view in
                         view
                             .panGesture(direction: .down) { translation, phase in
                                 handleDownGesture(translation: translation, phase: phase)
                             }
                     }
-                    .conditionalModifier(closeGestureEnabled && enableGestures && coordinator.currentView != .timer && coordinator.currentView != .codex && !shouldDisplayNowPlayingFallbackNotice) { view in
+                    .conditionalModifier(closeGestureEnabled && enableGestures && coordinator.currentView != .timer && coordinator.currentView != .codex && coordinator.currentView != .terminal && !shouldDisplayNowPlayingFallbackNotice) { view in
                         view
                             .panGesture(direction: .up) { translation, phase in
                                 handleUpGesture(translation: translation, phase: phase)
                             }
                     }
-                    .conditionalModifier(enableHorizontalMediaGestures && enableGestures && (vm.notchState == .closed || (coordinator.currentView != .timer && coordinator.currentView != .codex)) && !shouldDisplayNowPlayingFallbackNotice) { view in
+                    .conditionalModifier(enableHorizontalMediaGestures && enableGestures && (vm.notchState == .closed || (coordinator.currentView != .timer && coordinator.currentView != .codex && coordinator.currentView != .terminal)) && !shouldDisplayNowPlayingFallbackNotice) { view in
                         view
                             .panGesture(direction: .left) { translation, phase in
                                 handleNextTrackGesture(translation: translation, phase: phase)
@@ -465,6 +474,9 @@ struct ContentView: View {
             if state == .open && codexUsageDisplay != .off {
                 Task { await CodexUsageStore.shared.refreshAllowance(force: true) }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+            scheduleCloseIfNotHovering(overNotch: vm)
         }
         .onChange(of: coordinator.currentView) { _, _ in gestureProgress = .zero }
         .onAppear { CodexUsageStore.shared.setGlanceMonitoring(enabled: codexUsageDisplay != .off) }
@@ -644,7 +656,7 @@ struct ContentView: View {
             if vm.notchState == .open {
                 VStack {
                     // An explicitly opened workspace retains its own content.
-                    if compactMode && coordinator.currentView != .timer && coordinator.currentView != .codex {
+                    if compactMode && coordinator.currentView != .timer && coordinator.currentView != .codex && coordinator.currentView != .terminal {
                         // Player only — no tab switching, so currentView is
                         // ignored here rather than offering a shelf the
                         // compact layout has no room (or tab bar) for.
@@ -674,6 +686,9 @@ struct ContentView: View {
                         case .timer:
                             FocusTimerView()
                                 .transition(tabTransition)
+                        case .terminal:
+                            NotchTerminalView()
+                                .transition(.opacity)
                         case .codex:
                             CodexUsageView()
                                 .transition(tabTransition)
@@ -824,6 +839,12 @@ extension ContentView {
         return didOpen
     }
 
+    private var notchIsTyping: Bool {
+        NSApp.windows.contains {
+            ($0 as? BoringNotchSkyLightWindow)?.wantsKeyForTextInput == true && $0.isKeyWindow
+        }
+    }
+
     // MARK: - Hover Management
 
     /// Closes the open notch after the hover grace period unless a popover
@@ -831,7 +852,8 @@ extension ContentView {
     private func scheduleCloseIfNotHovering(overNotch notchViewModel: BoringViewModel) {
         guard notchViewModel.notchState == .open,
               !isHovering,
-              !notchViewModel.isPopoverActive else { return }
+              !notchViewModel.isPopoverActive,
+              !notchIsTyping else { return }
         hoverTask?.cancel()
         hoverTask = Task {
             try? await Task.sleep(for: .milliseconds(hoverExitDelayMilliseconds))
@@ -840,6 +862,7 @@ extension ContentView {
                 if self.vm.notchState == .open,
                    !self.isHovering,
                    !self.vm.isPopoverActive,
+                   !self.notchIsTyping,
                    !SharingStateManager.shared.preventNotchClose {
                     self.vm.close()
                 }
@@ -890,6 +913,7 @@ extension ContentView {
 
                     if self.vm.notchState == .open,
                        !self.vm.isPopoverActive,
+                   !self.notchIsTyping,
                        !SharingStateManager.shared.preventNotchClose {
                         self.vm.close()
                     }

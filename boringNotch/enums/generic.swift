@@ -23,20 +23,22 @@ enum NotchViews: String, CaseIterable {
     case shelf
     case timer
     case codex
+    case terminal
 
-    static func restored(savedTab: String, rememberLastTab: Bool, shelfEnabled: Bool) -> Self {
+    static func restored(savedTab: String, rememberLastTab: Bool, shelfEnabled: Bool, terminalEnabled: Bool = true) -> Self {
         guard rememberLastTab, let tab = Self(rawValue: savedTab) else { return .home }
-        return tab == .shelf && !shelfEnabled ? .home : tab
+        return (tab == .shelf && !shelfEnabled) || (tab == .terminal && !terminalEnabled) ? .home : tab
     }
 
     func nextOpenTab(
         rememberLastTab: Bool,
         shelfEnabled: Bool,
         shelfHasItems: Bool,
-        openShelfByDefault: Bool
+        openShelfByDefault: Bool,
+        terminalEnabled: Bool = true
     ) -> Self {
         if rememberLastTab {
-            return self == .shelf && !shelfEnabled ? .home : self
+            return (self == .shelf && !shelfEnabled) || (self == .terminal && !terminalEnabled) ? .home : self
         }
         return shelfEnabled && shelfHasItems && openShelfByDefault ? .shelf : .home
     }

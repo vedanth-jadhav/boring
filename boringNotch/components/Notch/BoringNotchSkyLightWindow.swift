@@ -53,6 +53,8 @@ class BoringNotchSkyLightWindow: NSPanel {
 
     private func configureWindow() {
         isFloatingPanel = true
+        becomesKeyOnlyIfNeeded = true
+        hidesOnDeactivate = false
         isOpaque = false
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
@@ -153,13 +155,33 @@ class BoringNotchSkyLightWindow: NSPanel {
     /// (createBoringNotchWindow uses BoringNotchSkyLightWindow, not the
     /// separate, unused BoringNotchWindow class) — an earlier fix targeted
     /// that unused class and silently did nothing.
-    var wantsKeyForTextInput = false {
-        didSet {
-            guard wantsKeyForTextInput != oldValue else { return }
-            if wantsKeyForTextInput {
-                makeKey()
-            }
+    let keyboardFocus = NotchKeyboardFocus()
+
+    var wantsKeyForTextInput = false
+
+    override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
+        let accepted = super.makeFirstResponder(responder)
+        if accepted, let view = responder as? NSView,
+           view is NSTextField || view is NSTextInputClient {
+            let input = (view as? NSTextView).flatMap { $0.isFieldEditor ? $0.delegate as? NSView : nil } ?? view
+            keyboardFocus.becameFirstResponder(input, in: self)
         }
+        return accepted
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // SwiftUI Return/Space shortcuts must not run while an embedded input owns typing.
+        if keyboardFocus.inputResponder(in: self) != nil, !event.modifierFlags.contains(.command) { return false }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, !event.modifierFlags.contains(.command),
+           let responder = keyboardFocus.inputResponder(in: self) {
+            responder.keyDown(with: event)
+            return
+        }
+        super.sendEvent(event)
     }
 
     override var canBecomeKey: Bool { wantsKeyForTextInput }

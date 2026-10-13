@@ -27,6 +27,19 @@ struct FocusSessionChecks {
             print("PASS: \(description)")
         }
 
+        let setup = FocusDurationSelection()
+        setup.mode = .caffeine
+        check(setup.needsCaffeineSetup(isActive: false), "Caffeine begins with app selection")
+        setup.completeCaffeineSetup()
+        check(!setup.needsCaffeineSetup(isActive: false), "Continue reaches duration selection")
+        setup.caffeineSettingsOpen = true
+        check(setup.needsCaffeineSetup(isActive: false), "settings can be opened before starting")
+        setup.completeCaffeineSetup()
+        check(setup.caffeineReady && !setup.caffeineSettingsOpen, "Continue after settings returns to the duration ruler")
+        setup.caffeineSettingsOpen = true
+        setup.completeCaffeineSetup()
+        check(!setup.needsCaffeineSetup(isActive: true), "Done returns to an active or paused session")
+
         manager.selectedMinutes = 1
         check(manager.start(), "one-minute timer starts")
         clock = clock.addingTimeInterval(59.8)

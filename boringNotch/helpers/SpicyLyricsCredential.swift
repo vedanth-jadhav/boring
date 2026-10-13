@@ -3,7 +3,18 @@ import LocalAuthentication
 import Security
 
 enum SpicyLyricsCredential {
-    enum SavedStatus: Sendable { case available, missing, needsAccess }
+    enum SavedStatus: Sendable { case available, missing, needsAccess, unavailable }
+    enum LoadResult: Sendable, Equatable {
+        case loaded(String), missing, inaccessible(OSStatus)
+    }
+
+    static func requiresAuthorization(_ status: OSStatus) -> Bool {
+        status == errSecAuthFailed || status == errSecInteractionNotAllowed || status == errSecUserCanceled
+    }
+    static func isTemporaryFailure(_ status: OSStatus) -> Bool {
+        !requiresAuthorization(status) && status != errSecDecode
+    }
+
     enum StorageError: LocalizedError {
         case unavailable
         var errorDescription: String? {
@@ -26,35 +37,49 @@ enum SpicyLyricsCredential {
     }
 
     static func load(service: String = service) -> String? {
-        try? LegacyKeychainAccess.withInteraction(false) {
-            let identity = identity(service: service)
-            return read(identity: identity)
+        guard case .loaded(let key) = loadResult(service: service) else { return nil }
+        return key
+    }
+
+    static func loadResult(service: String = service) -> LoadResult {
+        do {
+            return try LegacyKeychainAccess.withInteraction(false) { read(identity: identity(service: service)) }
+        } catch {
+            return .inaccessible(errSecNotAvailable)
         }
     }
 
     static func savedStatus() -> SavedStatus {
-        if load() != nil { return .available }
-        return (try? LegacyKeychainAccess.withInteraction(false) {
-            var query = identity(service: service)
-            query[kSecReturnAttributes as String] = true
-            query[kSecMatchLimit as String] = kSecMatchLimitOne
-            let status = SecItemCopyMatching(query as CFDictionary, nil)
-            return status == errSecItemNotFound ? .missing : .needsAccess
-        }) ?? .needsAccess
+        switch loadResult() {
+        case .loaded: return .available
+        case .missing: return .missing
+        case .inaccessible(let status):
+            return requiresAuthorization(status) ? .needsAccess : .unavailable
+        }
     }
 
     /// Authentication is permitted only after the user presses the explicit
     /// settings action. No credential value is exposed outside this helper.
-    static func authorizeSavedKey() throws {
-        try LegacyKeychainAccess.withInteraction(true) {
+    static func authorizeSavedKey() throws -> String {
+        let initial = loadResult()
+        let needsPermissionRepair: Bool
+        if case .inaccessible(let status) = initial {
+            needsPermissionRepair = requiresAuthorization(status)
+        } else {
+            needsPermissionRepair = false
+        }
+        return try LegacyKeychainAccess.withInteraction(true) {
             let identity = identity(service: service)
-            guard read(identity: identity, allowInteraction: true) != nil else {
+            guard case .loaded(let key) = read(identity: identity, allowInteraction: true) else {
                 throw StorageError.unavailable
             }
+            // Only an explicit authorization action after an authorization error may repair access.
+            if needsPermissionRepair { try LegacyKeychainAccess.authorizeCurrentApplication(identity: identity) }
+            return key
         }
     }
 
-    private static func read(identity: [String: Any], allowInteraction: Bool = false) -> String? {
+    private static func read(identity: [String: Any], allowInteraction: Bool = false) -> LoadResult {
         let context = LAContext()
         context.interactionNotAllowed = !allowInteraction
         var query = identity
@@ -62,9 +87,13 @@ enum SpicyLyricsCredential {
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         query[kSecUseAuthenticationContext as String] = context
         var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-              let data = item as? Data, let key = String(data: data, encoding: .utf8), !key.isEmpty else { return nil }
-        return key.trimmingCharacters(in: .whitespacesAndNewlines)
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess else {
+            return status == errSecItemNotFound ? .missing : .inaccessible(status)
+        }
+        guard let data = item as? Data, let key = String(data: data, encoding: .utf8),
+              !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .inaccessible(errSecDecode) }
+        return .loaded(key.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     static func save(_ value: String, service: String = service) throws {

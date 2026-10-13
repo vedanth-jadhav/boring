@@ -28,6 +28,7 @@ function connect() {
       });
     });
     port.onDisconnect.addListener(() => {
+      console.warn("Octave native bridge disconnected:", chrome.runtime.lastError?.message ?? "native host closed");
       if (nativePort !== port) return;
       nativePort = null;
       clearTimeout(reconnectTimer);
@@ -40,7 +41,8 @@ function connect() {
       // Ask the media element for a fresh sample immediately.
       chrome.tabs.sendMessage(activeTab, {type: "command", action: "refresh"}).catch(() => {});
     }
-  } catch (_) {
+  } catch (error) {
+    console.warn("Octave native bridge connection failed:", String(error));
     reconnectTimer = setTimeout(connect, 1500);
   }
 }

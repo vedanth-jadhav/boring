@@ -99,6 +99,7 @@ final class BoringViewCoordinator: ObservableObject {
     private var accessibilityObserver: Any?
     private var osdReplacementCancellable: AnyCancellable?
     private var boringShelfCancellable: AnyCancellable?
+    private var terminalCancellable: AnyCancellable?
     private var osdSourceCancellables: [AnyCancellable] = []
 
     private var uiEventCancellable: AnyCancellable?
@@ -107,7 +108,8 @@ final class BoringViewCoordinator: ObservableObject {
         currentView = NotchViews.restored(
             savedTab: lastSelectedTab,
             rememberLastTab: openLastTabByDefault,
-            shelfEnabled: Defaults[.boringShelf]
+            shelfEnabled: Defaults[.boringShelf],
+            terminalEnabled: Defaults[.terminalEnabled]
         )
 
         // Perform migration from name-based to UUID-based storage
@@ -194,6 +196,13 @@ final class BoringViewCoordinator: ObservableObject {
             Defaults.publisher(.osdBrightnessSource).sink { [weak self] _ in Task { @MainActor in self?.applyOSDSources() } },
             Defaults.publisher(.osdVolumeSource).sink { [weak self] _ in Task { @MainActor in self?.applyOSDSources() } }
         ]
+        terminalCancellable = Defaults.publisher(.terminalEnabled)
+            .sink { [weak self] change in
+                Task { @MainActor in
+                    if !change.newValue && self?.currentView == .terminal { self?.currentView = .home }
+                    NotchTerminalManager.shared.setEnabled(change.newValue)
+                }
+            }
         boringShelfCancellable = Defaults.publisher(.boringShelf)
             .sink { [weak self] change in
                 Task { @MainActor in

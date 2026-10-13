@@ -6,6 +6,7 @@ import SwiftUI
 struct LiquidGlassSurface<Content: View>: View {
     var shape: NotchShape
     var expanded: Bool
+    var minimumOpacity: Double = 0.10
     @ViewBuilder var content: Content
 
     @Default(.reduceGlass) private var reduceGlass
@@ -13,7 +14,7 @@ struct LiquidGlassSurface<Content: View>: View {
     @Environment(\.colorSchemeContrast) private var contrast
 
     private var smoke: LinearGradient {
-        let floor = contrast == .increased ? 0.62 : 0.10
+        let floor = contrast == .increased ? 0.62 : minimumOpacity
         return LinearGradient(stops: [
             .init(color: .black, location: 0),
             .init(color: .black, location: 0.56),
@@ -36,10 +37,15 @@ struct LiquidGlassSurface<Content: View>: View {
             // leading-aligned elements slide sideways before settling.
             content
                 .padding(.horizontal, shape.topCornerRadius)
-                .background { smoke }
-                // Identity disables the optical effect while retaining the
-                // content's structural identity throughout open/close.
-                .glassEffect(expanded ? .clear : .identity, in: shape)
+                .background {
+                    // Native text editors must not enter the glass compositor's content tree.
+                    shape.fill(.clear)
+                        .glassEffect(expanded ? .clear : .identity, in: shape)
+                        .overlay { smoke.clipShape(shape) }
+                        .environment(\.materialActiveAppearance, .active)
+                        .environment(\.appearsActive, true)
+                        .allowsHitTesting(false)
+                }
         } else {
             // Solid accessibility/older-system fallback, with no legacy blur.
             content

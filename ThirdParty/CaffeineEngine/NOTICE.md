@@ -1,0 +1,1 @@
+Derived from https://github.com/krishhgg/Insomnia at 2c116dd6399c98225cacfc6e6802f74aa3b2ecb2 under the included MIT license. Integrated as an isolated module; UI and application policy belong to Boring Notch.

@@ -19,16 +19,18 @@ let tabs = [
     TabModel(label: "Home", icon: "house.fill", view: .home),
     TabModel(label: "Shelf", icon: "tray.fill", view: .shelf),
     TabModel(label: "Timer", icon: "timer", view: .timer),
-    TabModel(label: "Codex usage", icon: "terminal", view: .codex)
+    TabModel(label: "Codex usage", icon: "chart.bar", view: .codex),
+    TabModel(label: "Terminal", icon: "terminal", view: .terminal)
 ]
 
 struct TabSelectionView: View {
+    @Default(.terminalEnabled) private var terminalEnabled
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace var animation
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(tabs.filter { $0.view != .shelf || Defaults[.boringShelf] }) { tab in
+            ForEach(tabs.filter { ($0.view != .shelf || Defaults[.boringShelf]) && ($0.view != .terminal || terminalEnabled) }) { tab in
                     TabButton(label: tab.label, icon: tab.icon, selected: coordinator.currentView == tab.view) {
                         withAnimation(reduceMotion ? nil : StandardAnimations.focusTab) {
                             coordinator.currentView = tab.view

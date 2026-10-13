@@ -23,48 +23,28 @@ struct ShelfView: View {
 
     var body: some View {
         @Bindable var interaction = dropInteraction
-
         ShelfQuickLookHost { quickLookService in
-            HStack(spacing: 12) {
-                VStack(spacing: 4) {
-                    ForEach([ShelfTool.whatsapp, .compress, .convert, .copyPath]) { tool in
-                        ShelfToolButton(tool: tool)
-                    }
-                    HStack(spacing: 5) {
-                        Button("Capture", systemImage: "camera.viewfinder") {
-                            ScreenshotShelfService.shared.capture()
-                        }
-                        .font(.system(size: 10, weight: .semibold))
-                        .buttonStyle(.plain)
-                        .frame(maxWidth: .infinity).frame(height: 23)
-                        .modifier(ShelfGlass(radius: 11))
-                        .help("Open the macOS screenshot toolbar (⌘⇧5)")
-                        FileShareView(dropInteraction: dropInteraction)
-                            .frame(width: 28, height: 23)
-                    }
+            panel(quickLookService: quickLookService)
+                .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $interaction.shelfDropTargeting) { providers in
+                    handleDrop(providers: providers)
                 }
-                .frame(width: 122)
-                panel(quickLookService: quickLookService)
-                    .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $interaction.dragDetectorTargeting) { providers in
-                        handleDrop(providers: providers)
-                    }
-            }
         }
+        .onDisappear { dropInteraction.shelfDropTargeting = false }
     }
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        guard !ShelfSelectionModel.shared.isDragging else { return false }
+        guard !providers.isEmpty, !ShelfSelectionModel.shared.isDragging else { return false }
         dropInteraction.dropEvent = true
-        shelfState.load(providers)
+        shelfState.load(providers, animation: animation)
         return true
     }
 
     private func panel(quickLookService: QuickLookService) -> some View {
         RoundedRectangle(cornerRadius: 16)
-            .fill(dropInteraction.dragDetectorTargeting ? Color.cyan.opacity(0.14) : Color.white.opacity(0.045))
+            .fill(dropInteraction.shelfDropTargeting ? Color.cyan.opacity(0.14) : Color.white.opacity(0.045))
             .overlay {
                 RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(dropInteraction.dragDetectorTargeting ? Color.cyan.opacity(0.75) : .white.opacity(0.12), lineWidth: 1)
+                    .strokeBorder(dropInteraction.shelfDropTargeting ? Color.cyan.opacity(0.75) : .white.opacity(0.12), lineWidth: 1)
             }
             .overlay {
                 ZStack {
@@ -73,29 +53,27 @@ struct ShelfView: View {
                         .padding(8)
                 }
             }
-            .transaction { transaction in
-                transaction.animation = animation
-            }
+
     }
 
     private func content(quickLookService: QuickLookService) -> some View {
-        @Bindable var interaction = dropInteraction
-
         return Group {
             if shelfState.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "tray.and.arrow.down")
                         .symbolVariant(.fill)
                         .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(dropInteraction.dragDetectorTargeting ? .cyan : .white.opacity(0.85))
+                        .foregroundStyle(dropInteraction.shelfDropTargeting ? .cyan : .white.opacity(0.85))
                         .imageScale(.large)
 
-                    Text(dropInteraction.dragDetectorTargeting ? "Release to save" : "Save to Shelf")
+                    Text(dropInteraction.shelfDropTargeting ? "Release to save" : "Save to Shelf")
                         .foregroundStyle(.white)
                         .font(.system(size: 14, weight: .semibold))
+                    ShelfToolButton(tool: .whatsapp)
+                        .frame(width: 110, height: 26)
                     Text("Drop files & screenshots here")
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.7))
-                    Text(tools.notice)
+                    Text(shelfState.importNotice ?? tools.notice)
                         .font(.system(size: 10)).foregroundStyle(.white.opacity(0.65))
                         .lineLimit(2).multilineTextAlignment(.center)
                 }
@@ -114,12 +92,11 @@ struct ShelfView: View {
                 }
                 .padding(-spacing)
                 .scrollIndicators(.never)
-                .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $interaction.dragDetectorTargeting) { providers in
-                    handleDrop(providers: providers)
-                }
                     HStack(spacing: 6) {
-                        if tools.isWorking { ProgressView().controlSize(.mini) }
-                        Text(tools.notice).font(.system(size: 10)).foregroundStyle(.white.opacity(0.72)).lineLimit(1)
+                        ShelfToolButton(tool: .whatsapp, compact: false)
+                            .frame(width: 110, height: 26)
+                        if tools.isWorking || shelfState.isLoading { ProgressView().controlSize(.mini) }
+                        Text(shelfState.importNotice ?? tools.notice).font(.system(size: 10)).foregroundStyle(.white.opacity(0.72)).lineLimit(1)
                         Spacer(minLength: 0)
                         Text("\(shelfState.items.count)").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
                     }

@@ -170,6 +170,10 @@ struct NotchSettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .onChange(of: animationSpeedMultiplier) { oldValue, newValue in
+                    NSLog("Appearance preference animationSpeedMultiplier changed: %.2f → %.2f; key responder: %@",
+                          oldValue, newValue, NSApp.keyWindow?.firstResponder.map { String(describing: type(of: $0)) } ?? "none")
+                }
             }
             Defaults.Toggle(key: .compactMode) {
                 Text("Compact mode")

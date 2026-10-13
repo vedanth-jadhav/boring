@@ -10,6 +10,7 @@ import SwiftUI
 
 struct AppearanceSettingsView: View {
     @ObservedObject var coordinator = BoringViewCoordinator.shared
+    @Default(.reduceGlass) private var reduceGlass
     @Default(.useCustomAccentColor) var useCustomAccentColor
     @Default(.customAccentColorData) var customAccentColorData
     @ViewState private var customAccentColor: Color = .accentColor
@@ -24,6 +25,10 @@ struct AppearanceSettingsView: View {
                     Text("Reduce glass")
                     Text("Use a solid background to reduce graphics work.")
                         .font(.caption).foregroundStyle(.secondary)
+                }
+                .onChange(of: reduceGlass) { oldValue, newValue in
+                    NSLog("Appearance preference reduceGlass changed: %@ → %@; key responder: %@",
+                          String(oldValue), String(newValue), NSApp.keyWindow?.firstResponder.map { String(describing: type(of: $0)) } ?? "none")
                 }
             }
             idleSection

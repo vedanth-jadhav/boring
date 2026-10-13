@@ -20,13 +20,14 @@ low_priority_swift_build() {
 sdk_link_flags=(-Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker "$selected_sdk_version")
 app="$PWD/build/Boring Notch Octave.app"
 identity="${BORING_CODESIGN_IDENTITY:-Boring Notch Octave Local}"
-app_version="${BORING_APP_VERSION:-2.8.1-local}"
+app_version="${BORING_APP_VERSION:-2.8.2-local}"
 bash Scripts/prepare_spm.sh
 if [[ "$identity" != "-" ]] && ! security find-identity -v -p codesigning | grep -Fq "\"$identity\""; then
   bash Scripts/setup_local_signing.sh
 fi
 low_priority_swift_build -v -c "$configuration" --skip-update --sdk "$SDKROOT" "${sdk_link_flags[@]}" --product boringNotch
 low_priority_swift_build -v -c "$configuration" --skip-update --sdk "$SDKROOT" "${sdk_link_flags[@]}" --product BoringNotchXPCHelper
+low_priority_swift_build -c "$configuration" --skip-update --sdk "$SDKROOT" "${sdk_link_flags[@]}" --product CaffeineRecovery
 binary_dir=$(apple_swift build --build-system native -c "$configuration" --show-bin-path)
 for binary in boringNotch BoringNotchXPCHelper; do
   /usr/bin/xcrun otool -l "$binary_dir/$binary" | python3 -c '
@@ -43,8 +44,12 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" \
   "$app/Contents/Frameworks" "$app/Contents/PrivateFrameworks" \
   "$app/Contents/XPCServices/BoringNotchXPCHelper.xpc/Contents/MacOS"
 cp "$binary_dir/boringNotch" "$app/Contents/MacOS/boringNotch"
+cp "$binary_dir/CaffeineRecovery" "$app/Contents/MacOS/"
+cp Scripts/caffeine_backstop.sh "$app/Contents/Resources/backstop.sh"
+cp ThirdParty/CaffeineEngine/LICENSE "$app/Contents/Resources/CaffeineEngine-LICENSE"
 cp "$binary_dir/BoringNotchXPCHelper" "$app/Contents/XPCServices/BoringNotchXPCHelper.xpc/Contents/MacOS/"
 cp boringNotch/boring.m4a "$app/Contents/Resources/"
+cp THIRD_PARTY_LICENSES "$app/Contents/Resources/"
 cp -R boringNotch/Resources/Romanization "$app/Contents/Resources/"
 cp mediaremote-adapter/mediaremote-adapter.pl mediaremote-adapter/MediaRemoteAdapterTestClient "$app/Contents/Resources/"
 cp -R mediaremote-adapter/MediaRemoteAdapter.framework "$app/Contents/PrivateFrameworks/"
@@ -101,7 +106,7 @@ info={
   'NSCalendarsUsageDescription':'Displays calendar events.',
   'NSRemindersUsageDescription':'Displays reminders.',
   'SUEnableAutomaticChecks':False,'SUAllowsAutomaticUpdates':False,
-  'BNLocalBuild':True
+  'BNLocalBuild':True,'CaffeineResumeFrozenVersion':1
 }
 (contents/'Info.plist').write_bytes(plistlib.dumps(info))
 helper=contents/'XPCServices/BoringNotchXPCHelper.xpc/Contents'
@@ -128,6 +133,7 @@ find "$app/Contents/Frameworks" "$app/Contents/PrivateFrameworks" -name '*.frame
   codesign --force --deep --sign "$identity" "$framework"
 done
 codesign --force --sign "$identity" "$app/Contents/XPCServices/BoringNotchXPCHelper.xpc"
+codesign --force --sign "$identity" "$app/Contents/MacOS/CaffeineRecovery"
 codesign --force --sign "$identity" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 echo "$app"

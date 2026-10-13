@@ -514,6 +514,8 @@ extension Defaults.Keys {
 
     // MARK: Shelf
     static let boringShelf = Key<Bool>("boringShelf", default: true)
+    static let terminalEnabled = Key<Bool>("terminalEnabled", default: true)
+    static let terminalApplication = Key<String>("terminalApplication", default: "com.apple.Terminal")
     static let shakeShelfTools = Key<Bool>("shakeShelfTools", default: true)
     static let keepScreenshotsOnShelf = Key<Bool>("keepScreenshotsOnShelf", default: false)
     static let openShelfByDefault = Key<Bool>("openShelfByDefault", default: true)

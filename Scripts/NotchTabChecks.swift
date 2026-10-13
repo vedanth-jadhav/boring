@@ -38,6 +38,12 @@ import Foundation
                    == .home, "Invalid saved tabs must safely fall back to Home")
             checks += 1
         }
+        expect(NotchViews.restored(savedTab: "terminal", rememberLastTab: true, shelfEnabled: true,
+                                  terminalEnabled: false) == .home, "A disabled terminal must never restore")
+        expect(NotchViews.terminal.nextOpenTab(rememberLastTab: true, shelfEnabled: true,
+                                             shelfHasItems: false, openShelfByDefault: false,
+                                             terminalEnabled: false) == .home, "A disabled terminal must never reopen")
+        checks += 2
         print("\(checks) notch tab regression checks passed")
     }
 }

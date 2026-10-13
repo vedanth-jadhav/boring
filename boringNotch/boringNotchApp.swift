@@ -141,6 +141,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private var caffeineQuitPending = false
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !isMigratingLegacyBundle else { return .terminateNow }
+        guard !caffeineQuitPending else { return .terminateCancel }
+        caffeineQuitPending = true
+        Task { @MainActor in
+            let ready = await FocusSessionManager.shared.prepareToQuit()
+            caffeineQuitPending = false
+            sender.reply(toApplicationShouldTerminate: ready)
+        }
+        return .terminateLater
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
     }

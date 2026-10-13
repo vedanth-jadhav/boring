@@ -10,25 +10,26 @@ import Foundation
 import UniformTypeIdentifiers
 
 struct ShelfDropService {
+    struct ImportResult {
+        let items: [ShelfItem]
+        let failedCount: Int
+    }
+
     static func items(from providers: [NSItemProvider]) async -> [ShelfItem] {
-        // Process providers concurrently for better performance with large drops
-        await withTaskGroup(of: ShelfItem?.self) { group in
-            for provider in providers {
-                group.addTask {
-                    await processProvider(provider)
-                }
+        await importItems(from: providers).items
+    }
+
+    static func importItems(from providers: [NSItemProvider]) async -> ImportResult {
+        await withTaskGroup(of: (Int, ShelfItem?).self) { group in
+            for (index, provider) in providers.enumerated() {
+                group.addTask { (index, await processProvider(provider)) }
             }
-
-            var results: [ShelfItem] = []
-            results.reserveCapacity(providers.count)
-
-            for await item in group {
-                if let item = item {
-                    results.append(item)
-                }
+            var results: [(Int, ShelfItem)] = []
+            for await (index, item) in group {
+                if let item { results.append((index, item)) }
             }
-
-            return results
+            return ImportResult(items: results.sorted { $0.0 < $1.0 }.map { $0.1 },
+                                failedCount: providers.count - results.count)
         }
     }
 

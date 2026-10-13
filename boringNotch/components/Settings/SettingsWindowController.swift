@@ -94,7 +94,8 @@ class SettingsWindowController: NSWindowController {
 
         // Force window to front after activation
         DispatchQueue.main.async { [weak self] in
-            self?.window?.makeKeyAndOrderFront(nil)
+            guard let window = self?.window, NSApp.keyWindow === window else { return }
+            window.makeKeyAndOrderFront(nil)
         }
     }
 

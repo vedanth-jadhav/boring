@@ -20,7 +20,9 @@ final class EnhancedLyricsSettingsModel: ObservableObject {
         guard !Task.isCancelled else { return }
         hasSavedKey = status != .missing
         needsKeychainAccess = status == .needsAccess
-        if status == .needsAccess {
+        if status == .unavailable {
+            report("Keychain is temporarily unavailable. Unlock it and try again; the saved key has not been changed.", error: true)
+        } else if status == .needsAccess {
             report("Your key is still saved in Keychain. Authorize it once below to restore enhanced lyrics. The app won’t request access automatically on launch.", error: true)
         }
     }
@@ -44,13 +46,13 @@ final class EnhancedLyricsSettingsModel: ObservableObject {
             case .valid:
                 do {
                     try await Task.detached(priority: .utility) { try SpicyLyricsCredential.save(key) }.value
-                    await SpicyLyricsClient.shared.reloadCredential()
+                    await SpicyLyricsClient.shared.reloadCredential(credential: key)
                     self.hasSavedKey = true
                     self.needsKeychainAccess = false
                     self.draftKey = ""
                     Defaults[.enableEnhancedLyrics] = true
                     Defaults[.enableLyrics] = true
-                    LyricsService.shared.configurationChanged()
+                    LyricsService.shared.configurationChanged(reloadCredential: false)
                     self.report("Key saved. Enhanced lyrics are on.", error: false)
                 } catch { self.report(error.localizedDescription, error: true) }
             case .invalid:
@@ -76,7 +78,7 @@ final class EnhancedLyricsSettingsModel: ObservableObject {
                 try await Task.detached(priority: .utility) { try SpicyLyricsCredential.remove() }.value
                 await SpicyLyricsClient.shared.reloadCredential()
                 Defaults[.enableEnhancedLyrics] = false
-                LyricsService.shared.configurationChanged()
+                LyricsService.shared.configurationChanged(reloadCredential: false)
                 self.hasSavedKey = false
                 self.needsKeychainAccess = false
                 self.draftKey = ""
@@ -93,11 +95,11 @@ final class EnhancedLyricsSettingsModel: ObservableObject {
             guard let self else { return }
             defer { self.isBusy = false }
             do {
-                try await Task.detached(priority: .utility) { try SpicyLyricsCredential.authorizeSavedKey() }.value
-                await SpicyLyricsClient.shared.reloadCredential()
+                let key = try await Task.detached(priority: .utility) { try SpicyLyricsCredential.authorizeSavedKey() }.value
+                await SpicyLyricsClient.shared.reloadCredential(credential: key)
                 self.needsKeychainAccess = false
                 self.hasSavedKey = true
-                LyricsService.shared.configurationChanged()
+                LyricsService.shared.configurationChanged(reloadCredential: false)
                 self.report("Saved key authorized for this signed app.", error: false)
             } catch { self.report(error.localizedDescription, error: true) }
         }

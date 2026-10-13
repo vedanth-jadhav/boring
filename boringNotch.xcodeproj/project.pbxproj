@@ -196,6 +196,19 @@
 		F2A1C0000000000000000008 /* LyricPlaybackClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000007 /* LyricPlaybackClock.swift */; };
 		F2A1C000000000000000000A /* LyricTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000009 /* LyricTimeline.swift */; };
 		F2A1C000000000000000000C /* LyricVocalFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C000000000000000000B /* LyricVocalFrame.swift */; };
+		D70100000000000000000004 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = D70100000000000000000005 /* SwiftTerm */; };
+		FD926256BAD0617125BE55CF /* CaffeineAppSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 597CF9E1F7D106BE9BFBB69D /* CaffeineAppSummary.swift */; };
+		8C88B00BE55737928F2CDC68 /* CaffeineOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49F33927D7E88CE8C6C8E31 /* CaffeineOptionsView.swift */; };
+		32E509984BEC132BF5800034 /* CaffeineSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA6FD08D065EB2C12FEDA13 /* CaffeineSetupView.swift */; };
+		49D5F6DECD8373EA1C21A1EC /* CaffeineAppRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B98BF81C06A8C07ED1CD100 /* CaffeineAppRow.swift */; };
+		608E4CE1B0AF8AF0A71D16B4 /* FocusDurationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC8B3A4230BC1FC156E97B4 /* FocusDurationPicker.swift */; };
+		46D73AB6B61F2D2245B16B77 /* FocusActiveSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 029BACFF52C070865EEDF1A9 /* FocusActiveSessionView.swift */; };
+		DD5FFAF86D1AE5877B1274E2 /* CaffeineSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B79BE204E2CDA5A81F9A23F9 /* CaffeineSettings.swift */; };
+		B9087EDC78934B3007CA8A10 /* CaffeineAppChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E776BC0613AF398BDCFC41 /* CaffeineAppChoice.swift */; };
+		CF00CAFFE100000000000003 /* CaffeineEngine in Frameworks */ = {isa = PBXBuildFile; productRef = CF00CAFFE100000000000002 /* CaffeineEngine */; };
+		5C3321301BFD45A65606ED27 /* CaffeineSearchField.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9FBD4D408EC988DE8D25A8A /* CaffeineSearchField.swift */; };
+		2824A1C9C774123C53ECB16C /* CaffeineSearchTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0068F4847F1518CC9F0A496 /* CaffeineSearchTextField.swift */; };
+		D70100000000000000000004 /* NotchKeyboardFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70100000000000000000005 /* NotchKeyboardFocus.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -423,6 +436,17 @@
 		F2A1C0000000000000000007 /* LyricPlaybackClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricPlaybackClock.swift; sourceTree = "<group>"; };
 		F2A1C0000000000000000009 /* LyricTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricTimeline.swift; sourceTree = "<group>"; };
 		F2A1C000000000000000000B /* LyricVocalFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricVocalFrame.swift; sourceTree = "<group>"; };
+		597CF9E1F7D106BE9BFBB69D /* CaffeineAppSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/CaffeineAppSummary.swift; sourceTree = SOURCE_ROOT; };
+		A49F33927D7E88CE8C6C8E31 /* CaffeineOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/CaffeineOptionsView.swift; sourceTree = SOURCE_ROOT; };
+		5EA6FD08D065EB2C12FEDA13 /* CaffeineSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/CaffeineSetupView.swift; sourceTree = SOURCE_ROOT; };
+		8B98BF81C06A8C07ED1CD100 /* CaffeineAppRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/CaffeineAppRow.swift; sourceTree = SOURCE_ROOT; };
+		5CC8B3A4230BC1FC156E97B4 /* FocusDurationPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/FocusDurationPicker.swift; sourceTree = SOURCE_ROOT; };
+		029BACFF52C070865EEDF1A9 /* FocusActiveSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/FocusActiveSessionView.swift; sourceTree = SOURCE_ROOT; };
+		B79BE204E2CDA5A81F9A23F9 /* CaffeineSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/managers/CaffeineSettings.swift; sourceTree = SOURCE_ROOT; };
+		F2E776BC0613AF398BDCFC41 /* CaffeineAppChoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/models/CaffeineAppChoice.swift; sourceTree = SOURCE_ROOT; };
+		F9FBD4D408EC988DE8D25A8A /* CaffeineSearchField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/CaffeineSearchField.swift; sourceTree = SOURCE_ROOT; };
+		B0068F4847F1518CC9F0A496 /* CaffeineSearchTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/CaffeineSearchTextField.swift; sourceTree = SOURCE_ROOT; };
+		D70100000000000000000005 /* NotchKeyboardFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Notch/NotchKeyboardFocus.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -443,6 +467,9 @@
 		11F748502EC9AABA00F841DB /* BoringNotchXPCHelper */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (11F7485C2EC9AABA00F841DB /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = BoringNotchXPCHelper; sourceTree = "<group>"; };
 		8137A8BA990F4D9CBA56CC7A /* Shared */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Shared; sourceTree = "<group>"; };
 		A5167213301F85B40018095A /* boringNotchTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = boringNotchTests; sourceTree = "<group>"; };
+		D70100000000000000000001 /* components/Terminal */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = boringNotch/components/Terminal; sourceTree = SOURCE_ROOT; };
+		D70100000000000000000002 /* managers/Terminal */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = boringNotch/managers/Terminal; sourceTree = SOURCE_ROOT; };
+		D70100000000000000000003 /* models/Terminal */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = boringNotch/models/Terminal; sourceTree = SOURCE_ROOT; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -469,7 +496,9 @@
 				B18654392C6F4990000B926A /* KeyboardShortcuts in Frameworks */,
 				B19016222CC15B3D00E3F12E /* Defaults in Frameworks */,
 				111BE95D2ECD71E10079DD4E /* AsyncXPCConnection in Frameworks */,
+				D70100000000000000000004 /* SwiftTerm in Frameworks */,
 				B1628B922CC260C0003D8DF3 /* SwiftUIIntrospect in Frameworks */,
+				CF00CAFFE100000000000003 /* CaffeineEngine in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -789,6 +818,17 @@
 				D35CCAACE591DBF97B10BB31 /* FocusControlSurface.swift */,
 				4879A6C9BD3ABFF8B34FC1C2 /* FocusHaptics.swift */,
 				F3977BA4649149582C63FC50 /* FocusTimerView.swift */,
+				D70100000000000000000005 /* NotchKeyboardFocus.swift */,
+				B0068F4847F1518CC9F0A496 /* CaffeineSearchTextField.swift */,
+				F9FBD4D408EC988DE8D25A8A /* CaffeineSearchField.swift */,
+				F2E776BC0613AF398BDCFC41 /* CaffeineAppChoice.swift */,
+				B79BE204E2CDA5A81F9A23F9 /* CaffeineSettings.swift */,
+				029BACFF52C070865EEDF1A9 /* FocusActiveSessionView.swift */,
+				5CC8B3A4230BC1FC156E97B4 /* FocusDurationPicker.swift */,
+				8B98BF81C06A8C07ED1CD100 /* CaffeineAppRow.swift */,
+				5EA6FD08D065EB2C12FEDA13 /* CaffeineSetupView.swift */,
+				A49F33927D7E88CE8C6C8E31 /* CaffeineOptionsView.swift */,
+				597CF9E1F7D106BE9BFBB69D /* CaffeineAppSummary.swift */,
 				5C491527A6664AB55E1EF095 /* RulerMouseDrag.swift */,
 				96846D5FA83E56257748725A /* CaffeineManager.swift */,
 				493E87F6EBBCFAEC57972E82 /* FocusPowerManaging.swift */,
@@ -891,6 +931,9 @@
 		600E881A3042DEAD00B17BFC /* Recovered References */ = {
 			isa = PBXGroup;
 			children = (
+				D70100000000000000000001 /* components/Terminal */,
+				D70100000000000000000002 /* managers/Terminal */,
+				D70100000000000000000003 /* models/Terminal */,
 				8137A8BA990F4D9CBA56CC7A /* Shared */,
 			);
 			name = "Recovered References";
@@ -998,6 +1041,9 @@
 				11F7485A2EC9AABA00F841DB /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+				D70100000000000000000001 /* components/Terminal */,
+				D70100000000000000000002 /* managers/Terminal */,
+				D70100000000000000000003 /* models/Terminal */,
 				112FB72F2CCF12CC0015238C /* private */,
 				11DAAB303061BDED00E15887 /* Settings */,
 				11DAAB463061BE1600E15887 /* LiveActivities */,
@@ -1006,7 +1052,9 @@
 			);
 			name = boringNotch;
 			packageProductDependencies = (
+				D70100000000000000000005 /* SwiftTerm */,
 				14D032192C68F32E0096E6A1 /* LaunchAtLogin */,
+				CF00CAFFE100000000000002 /* CaffeineEngine */,
 				14D0321C2C68F3350096E6A1 /* Sparkle */,
 				B18654382C6F4990000B926A /* KeyboardShortcuts */,
 				9A987A0F2C73CA8D005CA465 /* Collections */,
@@ -1079,6 +1127,8 @@
 			);
 			mainGroup = 14CEF4092C5CAED200855D72;
 			packageReferences = (
+				CF00CAFFE100000000000001 /* XCLocalSwiftPackageReference "ThirdParty/CaffeineEngine" */,
+				D70100000000000000000006 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
 				14D032182C68F32E0096E6A1 /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
 				14D0321B2C68F3350096E6A1 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				B18654372C6F4990000B926A /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
@@ -1155,6 +1205,17 @@
 				7863D2CA65AEB99CE4E32230 /* FocusControlSurface.swift in Sources */,
 				AD4DFB18AFFBC4BEB64B4B81 /* FocusHaptics.swift in Sources */,
 				FC0C9DA827C5062CC7A48CB2 /* FocusTimerView.swift in Sources */,
+				D70100000000000000000004 /* NotchKeyboardFocus.swift in Sources */,
+				2824A1C9C774123C53ECB16C /* CaffeineSearchTextField.swift in Sources */,
+				5C3321301BFD45A65606ED27 /* CaffeineSearchField.swift in Sources */,
+				B9087EDC78934B3007CA8A10 /* CaffeineAppChoice.swift in Sources */,
+				DD5FFAF86D1AE5877B1274E2 /* CaffeineSettings.swift in Sources */,
+				46D73AB6B61F2D2245B16B77 /* FocusActiveSessionView.swift in Sources */,
+				608E4CE1B0AF8AF0A71D16B4 /* FocusDurationPicker.swift in Sources */,
+				49D5F6DECD8373EA1C21A1EC /* CaffeineAppRow.swift in Sources */,
+				32E509984BEC132BF5800034 /* CaffeineSetupView.swift in Sources */,
+				8C88B00BE55737928F2CDC68 /* CaffeineOptionsView.swift in Sources */,
+				FD926256BAD0617125BE55CF /* CaffeineAppSummary.swift in Sources */,
 				87AB153BCE5BAC51530B071C /* CodexModelRow.swift in Sources */,
 				9F84F8E7621F095E70FCE8A4 /* CodexQuotaLane.swift in Sources */,
 				8CAC94603602F09774319F22 /* CodexUsageView.swift in Sources */,
@@ -1740,6 +1801,10 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		CF00CAFFE100000000000001 /* XCLocalSwiftPackageReference "ThirdParty/CaffeineEngine" */ = {isa = XCLocalSwiftPackageReference; relativePath = ThirdParty/CaffeineEngine; };
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		111BE95B2ECD71E10079DD4E /* XCRemoteSwiftPackageReference "AsyncXPCConnection" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -1829,6 +1894,7 @@
 				version = 9.0.9;
 			};
 		};
+		D70100000000000000000006 /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/migueldeicaza/SwiftTerm.git"; requirement = {kind = exactVersion; version = 1.20.0; }; };
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1890,6 +1956,8 @@
 			package = B19016202CC15B3D00E3F12E /* XCRemoteSwiftPackageReference "Defaults" */;
 			productName = Defaults;
 		};
+		D70100000000000000000005 /* SwiftTerm */ = {isa = XCSwiftPackageProductDependency; package = D70100000000000000000006 /* XCRemoteSwiftPackageReference "SwiftTerm" */; productName = SwiftTerm; };
+		CF00CAFFE100000000000002 /* CaffeineEngine */ = {isa = XCSwiftPackageProductDependency; package = CF00CAFFE100000000000001 /* XCLocalSwiftPackageReference "ThirdParty/CaffeineEngine" */; productName = CaffeineEngine; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 14CEF40A2C5CAED200855D72 /* Project object */;

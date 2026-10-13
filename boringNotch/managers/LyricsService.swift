@@ -183,7 +183,7 @@ final class LyricsService: ObservableObject {
     }
 
     /// Toggle/key changes refresh the current song, without waiting for a skip.
-    func configurationChanged() {
+    func configurationChanged(reloadCredential: Bool = true) {
         configurationTask?.cancel()
         currentFetchTask?.cancel()
         spicyFetchTask?.cancel()
@@ -191,7 +191,7 @@ final class LyricsService: ObservableObject {
         guard let context = fetchContext else { return }
         if let key = activeCacheKey, let cached = preferredEntry(for: key) { apply(cached) }
         configurationTask = Task { [weak self] in
-            await SpicyLyricsClient.shared.reloadCredential()
+            if reloadCredential { await SpicyLyricsClient.shared.reloadCredential() }
             guard !Task.isCancelled, let self,
                   self.activeCacheKey == self.cacheKey(title: context.title, artist: context.artist) else { return }
             await self.fetchLyrics(bundleIdentifier: context.bundleIdentifier, title: context.title, artist: context.artist,

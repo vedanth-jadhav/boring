@@ -12,21 +12,27 @@ final class OctaveController: MediaControllerProtocol {
     let supportsVolumeControl = true
     let supportsFavorite = false
 
-    private let bridge = OctaveSocketBridge.shared
+    private let bridge: OctaveSocketBridge
+    private let reconnectGrace: Duration
+    private var disconnectExpiry: Task<Void, Never>?
     private var sequence = 0
     private var artworkURL: String?
     private var artworkTask: Task<Void, Never>?
     private var currentTrack = ""
     private var lastPositionPublish = Date.distantPast
 
-    init() {
+    init(bridge: OctaveSocketBridge? = nil, reconnectGrace: Duration = .seconds(5)) {
+        self.bridge = bridge ?? .shared
+        let bridge = self.bridge
+        self.reconnectGrace = reconnectGrace
         bridge.onMessage = { [weak self] message in self?.receive(message) }
-        bridge.onDisconnect = { [weak self] in self?.clearState() }
+        bridge.onDisconnect = { [weak self] reason in self?.transportInterrupted(reason: reason) }
         bridge.start()
     }
 
     deinit {
         artworkTask?.cancel()
+        disconnectExpiry?.cancel()
         let bridge = bridge
         Task { @MainActor in bridge.stop() }
     }
@@ -48,7 +54,18 @@ final class OctaveController: MediaControllerProtocol {
         bridge.send(["type": "command", "action": "setVolume", "volume": min(1, max(0, level))])
     }
     func setFavorite(_ favorite: Bool) async {}
-    func isActive() -> Bool { bridge.isConnected }
+    func isActive() -> Bool { bridge.isConnected || disconnectExpiry != nil }
+
+    private func transportInterrupted(reason: String) {
+        NSLog("Octave transport interrupted: %@", reason)
+        // Reconnecting alone is insufficient: expire unless fresh playback data arrives.
+        disconnectExpiry?.cancel()
+        disconnectExpiry = Task { [weak self, reconnectGrace] in
+            do { try await Task.sleep(for: reconnectGrace) } catch { return }
+            guard !Task.isCancelled else { return }
+            self?.clearState()
+        }
+    }
     func updatePlaybackInfo() async {}
 
     private func receive(_ message: [String: Any]) {
@@ -80,6 +97,8 @@ final class OctaveController: MediaControllerProtocol {
               let duration = message["duration"] as? Double,
               let playing = message["playing"] as? Bool,
               position.isFinite, duration.isFinite else { return }
+        disconnectExpiry?.cancel()
+        disconnectExpiry = nil
         let artist = message["artist"] as? String ?? ""
         let track = "\(title)|\(artist)"
         var state = playbackState
@@ -142,6 +161,8 @@ final class OctaveController: MediaControllerProtocol {
     }
 
     private func clearState() {
+        disconnectExpiry?.cancel()
+        disconnectExpiry = nil
         artworkTask?.cancel()
         artworkURL = nil
         currentTrack = ""
@@ -153,20 +174,23 @@ final class OctaveController: MediaControllerProtocol {
 }
 
 @MainActor
-private final class OctaveSocketBridge {
+final class OctaveSocketBridge {
     static let shared = OctaveSocketBridge()
     var onMessage: (([String: Any]) -> Void)?
-    var onDisconnect: (() -> Void)?
+    var onDisconnect: ((String) -> Void)?
+    private let writeQueue = DispatchQueue(label: "Octave.socket.writes")
+    private var connectionID: UUID?
     private(set) var isConnected = false
     private var server: Int32 = -1
     private var client: Int32 = -1
     private var stopped = false
     private var references = 0
-    private let path: String = {
-        let directory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/BoringNotchLocal", isDirectory: true)
-        return directory.appendingPathComponent("octave.sock").path
-    }()
+    private let path: String
+
+    init(path: String? = nil) {
+        self.path = path ?? FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/BoringNotchLocal/octave.sock").path
+    }
 
     func start() {
         references += 1
@@ -192,66 +216,127 @@ private final class OctaveSocketBridge {
         }
         guard result == 0, Darwin.listen(server, 1) == 0 else { Darwin.close(server); server = -1; return }
         chmod(path, 0o600)
-        let descriptor = server
+        let descriptor = Darwin.dup(server)
+        guard descriptor >= 0 else { Darwin.close(server); server = -1; return }
         DispatchQueue.global(qos: .utility).async { [weak self] in
+            defer { Darwin.close(descriptor) }
             while true {
                 let accepted = Darwin.accept(descriptor, nil, nil)
                 if accepted < 0 {
                     if errno == EINTR { continue }
                     return
                 }
-                Task { @MainActor [weak self] in self?.connected(accepted) }
+                let connectionID = UUID()
+                var noSignal: Int32 = 1
+                setsockopt(accepted, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout<Int32>.size))
+                var timeout = timeval(tv_sec: 2, tv_usec: 0)
+                setsockopt(accepted, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+                Task { @MainActor [weak self] in self?.connected(accepted, id: connectionID) }
                 var pending = Data()
                 var buffer = [UInt8](repeating: 0, count: 65536)
+                var reason = "peer closed the connection"
                 while true {
                     let count = Darwin.read(accepted, &buffer, buffer.count)
-                    if count <= 0 { break }
+                    if count < 0 {
+                        if errno == EINTR { continue }
+                        reason = "read failed (errno \(errno))"
+                        break
+                    }
+                    if count == 0 { break }
                     pending.append(contentsOf: buffer[..<count])
                     while let newline = pending.firstIndex(of: 10) {
                         let line = pending[..<newline]
                         pending.removeSubrange(...newline)
                         if let object = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any] {
-                            Task { @MainActor [weak self] in self?.onMessage?(object) }
+                            Task { @MainActor [weak self] in self?.received(object, id: connectionID) }
                         }
                     }
-                    if pending.count > 2_000_000 { break }
+                    if pending.count > 2_000_000 { reason = "unterminated message exceeded 2 MB"; break }
                 }
-                Darwin.close(accepted)
-                Task { @MainActor [weak self] in self?.disconnected(accepted) }
+                let disconnectReason = reason
+                Task { @MainActor [weak self] in
+                    Darwin.close(accepted)
+                    self?.disconnected(id: connectionID, reason: disconnectReason)
+                }
             }
         }
     }
 
-    private func connected(_ descriptor: Int32) {
-        guard !stopped else { Darwin.close(descriptor); return }
-        if client >= 0 && client != descriptor { Darwin.close(client) }
+    private func connected(_ descriptor: Int32, id: UUID) {
+        guard !stopped else { Darwin.shutdown(descriptor, SHUT_RDWR); return }
         client = descriptor
+        connectionID = id
         isConnected = true
     }
-    private func disconnected(_ descriptor: Int32) {
-        guard client == descriptor else { return }
-        client = -1
-        isConnected = false
-        onDisconnect?()
+
+    private func received(_ object: [String: Any], id: UUID) {
+        guard connectionID == id, !stopped else { return }
+        onMessage?(object)
     }
+
+    private func disconnected(id: UUID, reason: String) {
+        guard connectionID == id else { return }
+        client = -1
+        connectionID = nil
+        isConnected = false
+        onDisconnect?(reason)
+    }
+
     func send(_ object: [String: Any]) {
-        guard client >= 0,
+        guard client >= 0, let id = connectionID,
               let data = try? JSONSerialization.data(withJSONObject: object) else { return }
+        // The reader owns the original descriptor; dup prevents reuse while a write is queued.
+        let descriptor = Darwin.dup(client)
+        guard descriptor >= 0 else {
+            Darwin.shutdown(client, SHUT_RDWR)
+            disconnected(id: id, reason: "could not duplicate command socket (errno \(errno))")
+            return
+        }
         var payload = data
         payload.append(10)
-        payload.withUnsafeBytes { buffer in
-            guard let pointer = buffer.baseAddress else { return }
-            _ = Darwin.write(client, pointer, buffer.count)
+        writeQueue.async { [weak self, payload] in
+            defer { Darwin.close(descriptor) }
+            if let error = OctaveSocketWriter.writeAll(payload, to: descriptor) {
+                Task { @MainActor [weak self] in self?.writeFailed(id: id, reason: error) }
+            }
         }
     }
+    private func writeFailed(id: UUID, reason: String) {
+        guard connectionID == id else { return }
+        let descriptor = client
+        // Publish the write failure before waking the reader with a synthetic EOF.
+        disconnected(id: id, reason: reason)
+        Darwin.shutdown(descriptor, SHUT_RDWR)
+    }
+
     func stop() {
         references = max(0, references - 1)
         guard references == 0 else { return }
         stopped = true
-        if client >= 0 { Darwin.close(client); client = -1 }
-        if server >= 0 { Darwin.close(server); server = -1 }
+        if client >= 0 { Darwin.shutdown(client, SHUT_RDWR); client = -1 }
+        connectionID = nil
+        isConnected = false
+        if server >= 0 { Darwin.shutdown(server, SHUT_RDWR); Darwin.close(server); server = -1 }
         unlink(path)
         onMessage = nil
         onDisconnect = nil
+    }
+}
+
+/// A stream write can succeed with fewer bytes than requested.
+enum OctaveSocketWriter {
+    static func writeAll(_ data: Data, to descriptor: Int32,
+                         write: (Int32, UnsafeRawPointer, Int) -> Int = { Darwin.write($0, $1, $2) }) -> String? {
+        data.withUnsafeBytes { buffer in
+            guard let base = buffer.baseAddress else { return nil }
+            var offset = 0
+            while offset < buffer.count {
+                let count = write(descriptor, base.advanced(by: offset), buffer.count - offset)
+                if count < 0 && errno == EINTR { continue }
+                guard count > 0 else { return "command write failed (errno \(count == 0 ? 0 : errno))" }
+                offset += count
+            }
+            return nil
+        }
     }
 }

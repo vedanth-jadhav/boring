@@ -206,7 +206,8 @@ final class BoringViewModel: NSObject, ObservableObject {
             rememberLastTab: coordinator.openLastTabByDefault,
             shelfEnabled: Defaults[.boringShelf],
             shelfHasItems: !ShelfStateViewModel.shared.isEmpty,
-            openShelfByDefault: Defaults[.openShelfByDefault]
+            openShelfByDefault: Defaults[.openShelfByDefault],
+            terminalEnabled: Defaults[.terminalEnabled]
         )
     }
 

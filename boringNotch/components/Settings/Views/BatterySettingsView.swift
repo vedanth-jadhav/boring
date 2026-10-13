@@ -35,11 +35,6 @@ struct BatterySettingsView: View {
                 Text("Battery Information")
             }
         }
-        .onAppear {
-            Task { @MainActor in
-                await XPCHelperClient.shared.isAccessibilityAuthorized()
-            }
-        }
         .accentColor(.effectiveAccent)
         .navigationTitle("Battery")
     }

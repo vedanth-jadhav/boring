@@ -52,6 +52,7 @@ struct BoringHeader: View {
 
             HStack(spacing: 4) {
                 if vm.notchState == .open {
+                    TerminalServerIndicator { coordinator.currentView = .terminal }
                     if focus.isActive {
                         FocusActivityAnchor(width: codexUsageDisplay == .off ? FocusActivityMetrics.width(for: focus.session.duration) : 36)
                             .padding(.trailing, 4)
