@@ -159,6 +159,10 @@ class BoringNotchSkyLightWindow: NSPanel {
 
     var wantsKeyForTextInput = false
 
+    // shortcut: AppKit glass ignores SwiftUI's active-appearance override; replace when it exposes a public equivalent.
+    // Preserve the original non-key hover appearance, including while an editor owns focus.
+    @objc var _hasActiveAppearance: Bool { false }
+
     override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
         let accepted = super.makeFirstResponder(responder)
         if accepted, let view = responder as? NSView,

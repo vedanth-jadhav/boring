@@ -31,22 +31,21 @@ struct CodexGlanceLabel: View {
                             if showsTitle {
                                 Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.70))
                             }
-                            Text(value).font(.system(size: 11, weight: .semibold))
+                            CodexGlanceValue(value: value).font(.system(size: 11, weight: .semibold))
                                 .monospacedDigit().foregroundStyle(.white)
-                                .contentTransition(.numericText())
                             if let secondaryValue {
                                 Text("·").foregroundStyle(.white.opacity(0.45))
-                                Text(secondaryValue).font(.system(size: 11, weight: .medium))
+                                CodexGlanceValue(value: secondaryValue).font(.system(size: 11, weight: .medium))
                                     .monospacedDigit().foregroundStyle(.white.opacity(0.70))
                             }
                         }
                         .fixedSize()
                         HStack(spacing: 6) {
                             if showsTitle { Text(title).foregroundStyle(.white.opacity(0.70)) }
-                            Text(value).fontWeight(.semibold).foregroundStyle(.white)
+                            CodexGlanceValue(value: value).fontWeight(.semibold).foregroundStyle(.white)
                         }
                         .font(.system(size: 11)).monospacedDigit().fixedSize()
-                        Text(value).font(.system(size: 11, weight: .semibold)).monospacedDigit()
+                        CodexGlanceValue(value: value).font(.system(size: 11, weight: .semibold)).monospacedDigit()
                             .foregroundStyle(.white).minimumScaleFactor(0.8)
                     }
                 }

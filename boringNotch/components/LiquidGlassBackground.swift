@@ -38,12 +38,9 @@ struct LiquidGlassSurface<Content: View>: View {
             content
                 .padding(.horizontal, shape.topCornerRadius)
                 .background {
-                    // Native text editors must not enter the glass compositor's content tree.
-                    shape.fill(.clear)
-                        .glassEffect(expanded ? .clear : .identity, in: shape)
-                        .overlay { smoke.clipShape(shape) }
-                        .environment(\.materialActiveAppearance, .active)
-                        .environment(\.appearsActive, true)
+                    // Match the original smoke-under-glass surface without compositing editors.
+                    shape.fill(smoke)
+                        .glassEffect(.clear, in: shape)
                         .allowsHitTesting(false)
                 }
         } else {
