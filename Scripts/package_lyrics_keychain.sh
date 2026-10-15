@@ -11,7 +11,10 @@ for source in ('Scripts/package_lyrics_keychain.sh', 'LyricsKeychainHelper/main.
                'boringNotch/helpers/LegacyKeychainAccess.swift', 'boringNotch/helpers/SpicyLyricsCredential.swift'):
     digest.update(pathlib.Path(source).read_bytes())
 digest.update(sys.argv[2].encode())
-digest.update(subprocess.check_output(['security', 'find-certificate', '-c', sys.argv[1], '-p']))
+if sys.argv[1] == '-':
+    digest.update(b'ad-hoc-signing-identity')
+else:
+    digest.update(subprocess.check_output(['security', 'find-certificate', '-c', sys.argv[1], '-p']))
 print(digest.hexdigest())
 PY
 )
