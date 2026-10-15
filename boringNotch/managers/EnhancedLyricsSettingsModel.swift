@@ -23,7 +23,7 @@ final class EnhancedLyricsSettingsModel: ObservableObject {
         if status == .unavailable {
             report("Keychain is temporarily unavailable. Unlock it and try again; the saved key has not been changed.", error: true)
         } else if status == .needsAccess {
-            report("Your key is still saved in Keychain. Authorize it once below to restore enhanced lyrics. The app won’t request access automatically on launch.", error: true)
+            report("Your saved key needs a one-time move to secure storage that survives app updates. Authorize it below; enter your login password if macOS asks.", error: true)
         }
     }
 
@@ -100,7 +100,7 @@ final class EnhancedLyricsSettingsModel: ObservableObject {
                 self.needsKeychainAccess = false
                 self.hasSavedKey = true
                 LyricsService.shared.configurationChanged(reloadCredential: false)
-                self.report("Saved key authorized for this signed app.", error: false)
+                self.report("Saved key authorized. Future app updates keep this access.", error: false)
             } catch { self.report(error.localizedDescription, error: true) }
         }
     }

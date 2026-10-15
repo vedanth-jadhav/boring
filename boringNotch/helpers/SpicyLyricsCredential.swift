@@ -28,7 +28,11 @@ enum SpicyLyricsCredential {
          kSecAttrAccount as String: "api-key"]
     }
 
+    #if KEYCHAIN_FIXTURE
+    static let service = Bundle.main.object(forInfoDictionaryKey: "BNKeychainFixtureService") as! String
+    #else
     static let service = "local.vedanth.boringnotch.octave.spicy-lyrics"
+    #endif
 
     static func accepts(_ value: String) -> Bool {
         let key = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -42,6 +46,9 @@ enum SpicyLyricsCredential {
     }
 
     static func loadResult(service: String = service) -> LoadResult {
+        #if BORING_LOCAL_BUILD
+        if service == Self.service { return LyricsKeychainClient.perform("load") }
+        #endif
         do {
             return try LegacyKeychainAccess.withInteraction(false) { read(identity: identity(service: service)) }
         } catch {
@@ -60,21 +67,17 @@ enum SpicyLyricsCredential {
 
     /// Authentication is permitted only after the user presses the explicit
     /// settings action. No credential value is exposed outside this helper.
-    static func authorizeSavedKey() throws -> String {
-        let initial = loadResult()
-        let needsPermissionRepair: Bool
-        if case .inaccessible(let status) = initial {
-            needsPermissionRepair = requiresAuthorization(status)
-        } else {
-            needsPermissionRepair = false
+    static func authorizeSavedKey(service: String = service) throws -> String {
+        #if BORING_LOCAL_BUILD
+        if service == Self.service {
+            guard case .loaded(let key) = LyricsKeychainClient.perform("authorize") else { throw StorageError.unavailable }
+            return key
         }
+        #endif
         return try LegacyKeychainAccess.withInteraction(true) {
-            let identity = identity(service: service)
-            guard case .loaded(let key) = read(identity: identity, allowInteraction: true) else {
+            guard case .loaded(let key) = read(identity: identity(service: service), allowInteraction: true) else {
                 throw StorageError.unavailable
             }
-            // Only an explicit authorization action after an authorization error may repair access.
-            if needsPermissionRepair { try LegacyKeychainAccess.authorizeCurrentApplication(identity: identity) }
             return key
         }
     }
@@ -97,6 +100,12 @@ enum SpicyLyricsCredential {
     }
 
     static func save(_ value: String, service: String = service) throws {
+        #if BORING_LOCAL_BUILD
+        if service == Self.service {
+            guard case .loaded = LyricsKeychainClient.perform("save", value: value) else { throw StorageError.unavailable }
+            return
+        }
+        #endif
         try LegacyKeychainAccess.withInteraction(true) {
             let identity = identity(service: service)
             let data = Data(value.trimmingCharacters(in: .whitespacesAndNewlines).utf8)
@@ -113,6 +122,12 @@ enum SpicyLyricsCredential {
     }
 
     static func remove(service: String = service) throws {
+        #if BORING_LOCAL_BUILD
+        if service == Self.service {
+            guard case .loaded = LyricsKeychainClient.perform("remove") else { throw StorageError.unavailable }
+            return
+        }
+        #endif
         try LegacyKeychainAccess.withInteraction(true) {
             let identity = identity(service: service)
             let status = SecItemDelete(identity as CFDictionary)

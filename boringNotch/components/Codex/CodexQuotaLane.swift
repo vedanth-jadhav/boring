@@ -28,7 +28,8 @@ struct CodexQuotaLane: View {
                 Text(overdue ? "—" : "\(Int(window.remaining.rounded()))%")
                     .font(.system(size: 20, weight: .medium, design: .rounded))
                     .monospacedDigit().foregroundStyle(tint)
-                    .contentTransition(.numericText())
+                    .contentTransition(.numericText(value: window.remaining.rounded()))
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: window.remaining.rounded())
                 Text("left").font(.system(size: 9)).foregroundStyle(.white.opacity(0.6))
             }
             .frame(width: 56, alignment: .trailing)

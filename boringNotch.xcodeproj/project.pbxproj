@@ -53,6 +53,7 @@
 		AD4DFB18AFFBC4BEB64B4B81 /* FocusHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4879A6C9BD3ABFF8B34FC1C2 /* FocusHaptics.swift */; };
 		FC0C9DA827C5062CC7A48CB2 /* FocusTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3977BA4649149582C63FC50 /* FocusTimerView.swift */; };
 		EE462559C284380876E8B8CF /* RulerMouseDrag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C491527A6664AB55E1EF095 /* RulerMouseDrag.swift */; };
+		C31143F33B054A54A1E22B61 /* RulerInputSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F21E6198B0584D8FAE511030 /* RulerInputSurface.swift */; };
 		D058D122B9FEB4078CF21BD3 /* CaffeineManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96846D5FA83E56257748725A /* CaffeineManager.swift */; };
 		809D1FCB23BD0F1AF2483C6D /* FocusPowerManaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 493E87F6EBBCFAEC57972E82 /* FocusPowerManaging.swift */; };
 		56912596834768394C892BDD /* FocusSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2676961E59CD254B7ADDCDF5 /* FocusSessionManager.swift */; };
@@ -209,6 +210,7 @@
 		5C3321301BFD45A65606ED27 /* CaffeineSearchField.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9FBD4D408EC988DE8D25A8A /* CaffeineSearchField.swift */; };
 		2824A1C9C774123C53ECB16C /* CaffeineSearchTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0068F4847F1518CC9F0A496 /* CaffeineSearchTextField.swift */; };
 		D70100000000000000000004 /* NotchKeyboardFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70100000000000000000005 /* NotchKeyboardFocus.swift */; };
+		D70200000000000000000004 /* NotchHostingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70200000000000000000005 /* NotchHostingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -300,6 +302,7 @@
 		4879A6C9BD3ABFF8B34FC1C2 /* FocusHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/FocusHaptics.swift; sourceTree = SOURCE_ROOT; };
 		F3977BA4649149582C63FC50 /* FocusTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/FocusTimerView.swift; sourceTree = SOURCE_ROOT; };
 		5C491527A6664AB55E1EF095 /* RulerMouseDrag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/RulerMouseDrag.swift; sourceTree = SOURCE_ROOT; };
+		F21E6198B0584D8FAE511030 /* RulerInputSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/RulerInputSurface.swift; sourceTree = SOURCE_ROOT; };
 		96846D5FA83E56257748725A /* CaffeineManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/managers/CaffeineManager.swift; sourceTree = SOURCE_ROOT; };
 		493E87F6EBBCFAEC57972E82 /* FocusPowerManaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/managers/FocusPowerManaging.swift; sourceTree = SOURCE_ROOT; };
 		2676961E59CD254B7ADDCDF5 /* FocusSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/managers/FocusSessionManager.swift; sourceTree = SOURCE_ROOT; };
@@ -447,6 +450,7 @@
 		F9FBD4D408EC988DE8D25A8A /* CaffeineSearchField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/CaffeineSearchField.swift; sourceTree = SOURCE_ROOT; };
 		B0068F4847F1518CC9F0A496 /* CaffeineSearchTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Focus/CaffeineSearchTextField.swift; sourceTree = SOURCE_ROOT; };
 		D70100000000000000000005 /* NotchKeyboardFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Notch/NotchKeyboardFocus.swift; sourceTree = SOURCE_ROOT; };
+		D70200000000000000000005 /* NotchHostingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Notch/NotchHostingView.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -470,6 +474,9 @@
 		D70100000000000000000001 /* components/Terminal */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = boringNotch/components/Terminal; sourceTree = SOURCE_ROOT; };
 		D70100000000000000000002 /* managers/Terminal */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = boringNotch/managers/Terminal; sourceTree = SOURCE_ROOT; };
 		D70100000000000000000003 /* models/Terminal */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = boringNotch/models/Terminal; sourceTree = SOURCE_ROOT; };
+		D71300000000000000000001 /* models/AIUsage */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = boringNotch/models/AIUsage; sourceTree = SOURCE_ROOT; };
+		D71300000000000000000002 /* managers/AIUsage */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = boringNotch/managers/AIUsage; sourceTree = SOURCE_ROOT; };
+		D71300000000000000000003 /* components/AIUsage */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = boringNotch/components/AIUsage; sourceTree = SOURCE_ROOT; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -819,6 +826,7 @@
 				4879A6C9BD3ABFF8B34FC1C2 /* FocusHaptics.swift */,
 				F3977BA4649149582C63FC50 /* FocusTimerView.swift */,
 				D70100000000000000000005 /* NotchKeyboardFocus.swift */,
+				D70200000000000000000005 /* NotchHostingView.swift */,
 				B0068F4847F1518CC9F0A496 /* CaffeineSearchTextField.swift */,
 				F9FBD4D408EC988DE8D25A8A /* CaffeineSearchField.swift */,
 				F2E776BC0613AF398BDCFC41 /* CaffeineAppChoice.swift */,
@@ -830,6 +838,7 @@
 				A49F33927D7E88CE8C6C8E31 /* CaffeineOptionsView.swift */,
 				597CF9E1F7D106BE9BFBB69D /* CaffeineAppSummary.swift */,
 				5C491527A6664AB55E1EF095 /* RulerMouseDrag.swift */,
+				F21E6198B0584D8FAE511030 /* RulerInputSurface.swift */,
 				96846D5FA83E56257748725A /* CaffeineManager.swift */,
 				493E87F6EBBCFAEC57972E82 /* FocusPowerManaging.swift */,
 				2676961E59CD254B7ADDCDF5 /* FocusSessionManager.swift */,
@@ -932,6 +941,10 @@
 			isa = PBXGroup;
 			children = (
 				D70100000000000000000001 /* components/Terminal */,
+				D71300000000000000000001 /* models/AIUsage */,
+				D71300000000000000000002 /* managers/AIUsage */,
+				D71300000000000000000003 /* components/AIUsage */,
+
 				D70100000000000000000002 /* managers/Terminal */,
 				D70100000000000000000003 /* models/Terminal */,
 				8137A8BA990F4D9CBA56CC7A /* Shared */,
@@ -1042,6 +1055,10 @@
 			);
 			fileSystemSynchronizedGroups = (
 				D70100000000000000000001 /* components/Terminal */,
+				D71300000000000000000001 /* models/AIUsage */,
+				D71300000000000000000002 /* managers/AIUsage */,
+				D71300000000000000000003 /* components/AIUsage */,
+
 				D70100000000000000000002 /* managers/Terminal */,
 				D70100000000000000000003 /* models/Terminal */,
 				112FB72F2CCF12CC0015238C /* private */,
@@ -1206,6 +1223,7 @@
 				AD4DFB18AFFBC4BEB64B4B81 /* FocusHaptics.swift in Sources */,
 				FC0C9DA827C5062CC7A48CB2 /* FocusTimerView.swift in Sources */,
 				D70100000000000000000004 /* NotchKeyboardFocus.swift in Sources */,
+				D70200000000000000000004 /* NotchHostingView.swift in Sources */,
 				2824A1C9C774123C53ECB16C /* CaffeineSearchTextField.swift in Sources */,
 				5C3321301BFD45A65606ED27 /* CaffeineSearchField.swift in Sources */,
 				B9087EDC78934B3007CA8A10 /* CaffeineAppChoice.swift in Sources */,
@@ -1229,6 +1247,7 @@
 				506626EF71036B7AAD6C994D /* CodexQuotaSnapshot.swift in Sources */,
 				5EC2D566FE0C3B2DE439E3AF /* CodexTokenTotals.swift in Sources */,
 				EE462559C284380876E8B8CF /* RulerMouseDrag.swift in Sources */,
+				C31143F33B054A54A1E22B61 /* RulerInputSurface.swift in Sources */,
 				D058D122B9FEB4078CF21BD3 /* CaffeineManager.swift in Sources */,
 				809D1FCB23BD0F1AF2483C6D /* FocusPowerManaging.swift in Sources */,
 				56912596834768394C892BDD /* FocusSessionManager.swift in Sources */,

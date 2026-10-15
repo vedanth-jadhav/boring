@@ -7,6 +7,8 @@ struct LiquidGlassSurface<Content: View>: View {
     var shape: NotchShape
     var expanded: Bool
     var minimumOpacity: Double = 0.10
+    var width: CGFloat
+    var height: CGFloat?
     @ViewBuilder var content: Content
 
     @Default(.reduceGlass) private var reduceGlass
@@ -28,25 +30,24 @@ struct LiquidGlassSurface<Content: View>: View {
 
     var body: some View {
         if #available(macOS 27.0, *), !reduceTransparency, !reduceGlass {
-            // Opening and closing must preserve this branch's identity.
-            // Switching to the solid branch on close replaces the whole
-            // content tree and crossfades two surfaces instead of resizing one.
-            // Keep content, sizing, matched geometry and material in the same
-            // layout tree. A nested NSHostingController re-lays out its content
-            // against intermediate AppKit bounds during expansion, which makes
-            // leading-aligned elements slide sideways before settling.
             content
                 .padding(.horizontal, shape.topCornerRadius)
+                .frame(width: width, height: height, alignment: .top)
                 .background {
-                    // Match the original smoke-under-glass surface without compositing editors.
-                    shape.fill(smoke)
-                        .glassEffect(.clear, in: shape)
-                        .allowsHitTesting(false)
+                    // Keep the native backdrop alive as the panel resizes. A SwiftUI
+                    // glassEffect on the changing shape crossfades its old snapshot.
+                    ZStack {
+                        NativeNotchGlass(cornerRadius: shape.bottomCornerRadius)
+                        shape.fill(smoke)
+                    }
+                    .clipShape(shape)
+                    .allowsHitTesting(false)
                 }
         } else {
             // Solid accessibility/older-system fallback, with no legacy blur.
             content
                 .padding(.horizontal, shape.topCornerRadius)
+                .frame(width: width, height: height, alignment: .top)
                 .background {
                     shape.fill(LinearGradient(
                         colors: [.black, Color(white: expanded ? (contrast == .increased ? 0.035 : 0.075) : 0)],

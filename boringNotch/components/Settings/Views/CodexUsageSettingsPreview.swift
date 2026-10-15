@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct CodexUsageSettingsPreview: View {
+    var provider: AIUsageProvider = .codex
     let display: CodexUsageDisplay
     let outside: CodexReadingConfiguration
     let inside: CodexReadingConfiguration
@@ -12,7 +13,7 @@ struct CodexUsageSettingsPreview: View {
                     Text("Closed").font(.system(size: 10)).foregroundStyle(.white.opacity(0.6)).frame(width: 38, alignment: .leading)
                     NotchShape(topCornerRadius: 4, bottomCornerRadius: 10)
                         .fill(.black).frame(width: 98, height: 28)
-                    CodexGlanceLabel(title: outside.limit.shortTitle, value: value(outside), secondaryValue: secondaryValue(outside), showsTitle: outside.showsLabel)
+                    CodexGlanceLabel(title: provider == .grok ? "Credits" : outside.limit.shortTitle, value: value(outside), secondaryValue: secondaryValue(outside), showsTitle: outside.showsLabel)
                         .frame(width: width(outside, expanded: false), height: 26)
                         .modifier(CodexActivitySurface(expanded: false))
                 }
@@ -25,7 +26,7 @@ struct CodexUsageSettingsPreview: View {
                     Image(systemName: "house.fill").font(.system(size: 11)).foregroundStyle(.white.opacity(0.5)).frame(width: 24)
                     Spacer(minLength: 8)
                     if display != .off {
-                        CodexGlanceLabel(title: inside.limit.shortTitle, value: value(inside), secondaryValue: secondaryValue(inside), showsTitle: inside.showsLabel)
+                        CodexGlanceLabel(title: provider == .grok ? "Credits" : inside.limit.shortTitle, value: value(inside), secondaryValue: secondaryValue(inside), showsTitle: inside.showsLabel)
                             .frame(width: width(inside, expanded: true))
                     }
                     Image(systemName: "gear").font(.system(size: 12)).foregroundStyle(.white.opacity(0.8)).frame(width: 24)

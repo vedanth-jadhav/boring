@@ -36,17 +36,11 @@ struct CaffeineSetupView: View {
                     Text("Checked apps keep working when you close the lid.")
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.7))
                 }
-                HStack(spacing: 7) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.white.opacity(0.55)).accessibilityHidden(true)
-                    CaffeineSearchField(text: $search)
-                        .transaction { $0.animation = nil }
-                        .frame(height: 18)
-                    if !search.isEmpty {
-                        Button("Clear search", systemImage: "xmark.circle.fill") { search = "" }
-                            .labelStyle(.iconOnly).foregroundStyle(.white.opacity(0.6))
-                    }
-                }
-                .padding(.horizontal, 10).frame(height: 28).background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
+                CaffeineSearchField(text: $search)
+                    .controlSize(.small)
+                    .transaction { $0.animation = nil }
+                    .frame(height: 28)
+                    .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 7) {
                         HStack {

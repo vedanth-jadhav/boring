@@ -1,14 +1,21 @@
 import AppKit
 
 /// The notch stays nonactivating until the user clicks its search field.
-final class CaffeineSearchTextField: NSTextField {
+final class CaffeineSearchTextField: NSSearchField {
     private weak var inputPanel: BoringNotchSkyLightWindow?
     private var releasingKeyboard = false
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override var needsPanelToBecomeKey: Bool { true }
 
-
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let hit = super.hitTest(point) else { return nil }
+        // AppKit's internal renderer must not bypass the initial keyboard handoff.
+        if let editor = currentEditor(), window?.firstResponder === editor, window?.isKeyWindow == true {
+            return hit
+        }
+        return self
+    }
 
     func focusForTyping() {
         if let panel = window as? BoringNotchSkyLightWindow {

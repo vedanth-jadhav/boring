@@ -260,6 +260,8 @@ struct ContentView: View {
     var body: some View {
         @Bindable var dropInteraction = vm.dropInteraction
         let contentKey = closedNotchContent()
+        let closedSurfaceHeight: CGFloat? = (contentKey == .idle || contentKey == .music || contentKey == .batteryStatus)
+            ? displayClosedNotchHeight : nil
         let chinWidth = mainChinWidth()
         let satelliteWidth = satelliteWidth(chinWidth: chinWidth)
         let codexWidth = codexSatelliteWidth(chinWidth: chinWidth)
@@ -276,7 +278,12 @@ struct ContentView: View {
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
                 let mainLayout = LiquidGlassSurface(shape: currentNotchShape, expanded: vm.notchState == .open,
-                                                   minimumOpacity: coordinator.currentView == .terminal ? 0.55 : 0.10) {
+                                                   minimumOpacity: coordinator.currentView == .terminal ? 0.55 : 0.10,
+                                                   width: vm.notchState == .open
+                                                       ? (compactMode && coordinator.currentView != .timer && coordinator.currentView != .codex && coordinator.currentView != .terminal
+                                                          ? 336 + 24 + 2 * openedInsets.top : vm.notchSize.width)
+                                                       : chinWidth,
+                                                   height: vm.notchState == .open ? openNotchHeight : closedSurfaceHeight) {
                     NotchLayout()
                         .environmentObject(vm)
                         .environment(\.colorScheme, .dark)
@@ -286,7 +293,6 @@ struct ContentView: View {
                 }
                     // A floating notch keeps its glass appearance when a text input takes focus.
                     .environment(\.appearsActive, true)
-                    .frame(width: vm.notchState == .open ? (compactMode && coordinator.currentView != .timer && coordinator.currentView != .codex && coordinator.currentView != .terminal ? 336 + 24 + 2 * openedInsets.top : vm.notchSize.width) : nil, alignment: .top)
                     .clipShape(currentNotchShape)
                           .overlay(alignment: .top) {
                               displayClosedNotchHeight.isZero && vm.notchState == .closed ? nil
@@ -354,9 +360,6 @@ struct ContentView: View {
                                 .offset(x: -(satelliteWidth + 8))
                         }
                     }
-                    // Keep the visible surface anchored to the display top
-                    // as workspace content changes height.
-                    .frame(height: vm.notchState == .open ? openNotchHeight : nil, alignment: .top)
                     .conditionalModifier(true) { view in
                         return view
                             .animation(reduceMotion ? nil : StandardAnimations.smooth, value: gestureProgress)
@@ -371,31 +374,29 @@ struct ContentView: View {
                     .onHover { hovering in
                         handleHover(hovering)
                     }
-                    .onTapGesture {
-                        if vm.notchState == .closed && !shouldDisplayNowPlayingFallbackNotice {
-                            doOpen()
-                        }
+                    // Toggle recognition, not the wrapper's type: replacing this
+                    // subtree recreates the surface and turns the resize into on/off.
+                    .gesture(
+                        TapGesture().onEnded {
+                            if vm.notchState == .closed && !shouldDisplayNowPlayingFallbackNotice { doOpen() }
+                        },
+                        including: vm.notchState == .closed && !shouldDisplayNowPlayingFallbackNotice ? .all : .subviews
+                    )
+                    .panGesture(direction: .down,
+                                isEnabled: vm.notchState == .closed && enableGestures && coordinator.currentView != .terminal && !shouldDisplayNowPlayingFallbackNotice) { translation, phase in
+                        handleDownGesture(translation: translation, phase: phase)
                     }
-                    .conditionalModifier(enableGestures && coordinator.currentView != .terminal && !shouldDisplayNowPlayingFallbackNotice) { view in
-                        view
-                            .panGesture(direction: .down) { translation, phase in
-                                handleDownGesture(translation: translation, phase: phase)
-                            }
+                    .panGesture(direction: .up,
+                                isEnabled: vm.notchState == .open && closeGestureEnabled && enableGestures && coordinator.currentView != .timer && coordinator.currentView != .codex && coordinator.currentView != .terminal && !shouldDisplayNowPlayingFallbackNotice) { translation, phase in
+                        handleUpGesture(translation: translation, phase: phase)
                     }
-                    .conditionalModifier(closeGestureEnabled && enableGestures && coordinator.currentView != .timer && coordinator.currentView != .codex && coordinator.currentView != .terminal && !shouldDisplayNowPlayingFallbackNotice) { view in
-                        view
-                            .panGesture(direction: .up) { translation, phase in
-                                handleUpGesture(translation: translation, phase: phase)
-                            }
+                    .panGesture(direction: .left,
+                                isEnabled: enableHorizontalMediaGestures && enableGestures && (vm.notchState == .closed || (coordinator.currentView != .timer && coordinator.currentView != .codex && coordinator.currentView != .terminal)) && !shouldDisplayNowPlayingFallbackNotice) { translation, phase in
+                        handleNextTrackGesture(translation: translation, phase: phase)
                     }
-                    .conditionalModifier(enableHorizontalMediaGestures && enableGestures && (vm.notchState == .closed || (coordinator.currentView != .timer && coordinator.currentView != .codex && coordinator.currentView != .terminal)) && !shouldDisplayNowPlayingFallbackNotice) { view in
-                        view
-                            .panGesture(direction: .left) { translation, phase in
-                                handleNextTrackGesture(translation: translation, phase: phase)
-                            }
-                            .panGesture(direction: .right) { translation, phase in
-                                handlePreviousTrackGesture(translation: translation, phase: phase)
-                            }
+                    .panGesture(direction: .right,
+                                isEnabled: enableHorizontalMediaGestures && enableGestures && (vm.notchState == .closed || (coordinator.currentView != .timer && coordinator.currentView != .codex && coordinator.currentView != .terminal)) && !shouldDisplayNowPlayingFallbackNotice) { translation, phase in
+                        handlePreviousTrackGesture(translation: translation, phase: phase)
                     }
                     .onReceive(NotificationCenter.default.publisher(for: .sharingDidFinish)) { _ in
                         scheduleCloseIfNotHovering(overNotch: vm)

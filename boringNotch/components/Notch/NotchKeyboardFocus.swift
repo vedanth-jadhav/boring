@@ -47,12 +47,18 @@ final class NotchKeyboardFocus {
     }
 
     func release(_ view: NSView, in panel: BoringNotchSkyLightWindow) {
-        guard owner === view, inputResponder(in: panel) != nil else { return }
+        guard owner === view else { return }
+        let stillOwnsInput = inputResponder(in: panel) != nil
+        // A SwiftUI button can leave the host as responder before the editor is removed.
+        guard stillOwnsInput || panel.firstResponder === panel.contentView ||
+              panel.firstResponder === panel || panel.firstResponder == nil else { return }
         releasingOwner = view
         defer { releasingOwner = nil }
-        guard panel.makeFirstResponder(nil) else { return }
-        // Ending editing can synchronously install a new responder.
-        guard owner === view, panel.firstResponder == nil || panel.firstResponder === panel else { return }
+        if stillOwnsInput {
+            guard panel.makeFirstResponder(nil) else { return }
+            // Ending editing can synchronously install a new responder.
+            guard owner === view, panel.firstResponder == nil || panel.firstResponder === panel else { return }
+        }
         owner = nil
         panel.wantsKeyForTextInput = false
         guard panel.isKeyWindow else { return }

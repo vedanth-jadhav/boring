@@ -67,7 +67,7 @@ struct DynamicNotchApp: App {
 
     var body: some Scene {
         MenuBarExtra("boring.notch", systemImage: "sparkle", isInserted: $showMenuBarIcon) {
-            Button("Codex usage", systemImage: "terminal") {
+            Button("AI usage", systemImage: "chart.bar") {
                 appDelegate.showCodexUsage()
             }
             Divider()

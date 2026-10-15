@@ -15,7 +15,10 @@ struct TabButton: View {
 
     var body: some View {
         Button(action: onClick) {
-            Image(systemName: icon)
+            Group {
+                if icon == "codex-usage" { CodexLogo().frame(width: 16, height: 16) }
+                else { Image(systemName: icon) }
+            }
                 .padding(.horizontal, 12)
                 .contentShape(Capsule())
         }

@@ -19,7 +19,7 @@ let tabs = [
     TabModel(label: "Home", icon: "house.fill", view: .home),
     TabModel(label: "Shelf", icon: "tray.fill", view: .shelf),
     TabModel(label: "Timer", icon: "timer", view: .timer),
-    TabModel(label: "Codex usage", icon: "chart.bar", view: .codex),
+    TabModel(label: "AI usage", icon: "codex-usage", view: .codex),
     TabModel(label: "Terminal", icon: "terminal", view: .terminal)
 ]
 

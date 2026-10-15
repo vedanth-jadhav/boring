@@ -10,8 +10,10 @@ struct FocusControlSurface: ViewModifier {
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *), !reduceTransparency {
             content.glassEffect(.regular.tint(accent ? .orange.opacity(0.28) : .clear).interactive(), in: Capsule())
+                .contentShape(Capsule())
         } else {
             content.background(accent ? Color.orange.opacity(0.2) : Color.white.opacity(0.1), in: Capsule())
+                .contentShape(Capsule())
         }
     }
 }

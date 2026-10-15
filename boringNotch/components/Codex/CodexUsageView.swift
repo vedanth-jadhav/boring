@@ -37,7 +37,8 @@ import SwiftUI
         .frame(height: 238, alignment: .top)
         .foregroundStyle(.white)
         .buttonStyle(.plain)
-        .task(id: store.home) { await store.monitor() }
+        .task(id: "\(store.home.path)|\(store.provider.rawValue)") { await store.monitor() }
+        .onChange(of: store.provider) { showsModels = false; expandedModel = nil }
         .onChange(of: store.period) { _, _ in
             if let id = expandedModel, !store.models.contains(where: { $0.id == id }) {
                 expandedModel = nil
@@ -60,17 +61,22 @@ import SwiftUI
                 .accessibilityLabel(focusedModel == nil ? "Models. Back to Codex allowance" : "Back to model list")
                 .help(focusedModel == nil ? "Back to allowance" : "Back to models")
             } else {
-                Text("Codex").font(.system(size: 15, weight: .semibold))
+                CodexLogo().frame(width: 20, height: 20)
+                Picker("Service", selection: $store.provider) {
+                    ForEach(AIUsageProvider.allCases) { provider in Text(provider.title).tag(provider) }
+                }
+                .labelsHidden().fixedSize()
+                .accessibilityLabel("Usage account")
                 if let plan = store.quota?.plan {
                     Text(plan.replacingOccurrences(of: "_", with: " ").capitalized)
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
                 }
             }
             Spacer(minLength: 8)
-            if showsModels { periodPicker }
+            if showsModels && store.provider == .codex { periodPicker }
             if store.isRefreshing || store.isScanning {
                 ProgressView().controlSize(.mini).tint(.white).frame(width: 20)
-                    .accessibilityLabel("Refreshing Codex usage")
+                    .accessibilityLabel("Refreshing account usage")
             }
             Menu {
                 Button("Refresh usage", systemImage: "arrow.clockwise") {
@@ -78,7 +84,14 @@ import SwiftUI
                 }
                 .disabled(store.isRefreshing || store.isScanning)
                 Divider()
-                Button("Codex usage dashboard", systemImage: "arrow.up.right") { openDashboard() }
+                Button("Sign in to \(store.provider.accountTitle)", systemImage: "person.crop.circle") { store.connect() }
+                Button("Open account usage", systemImage: "arrow.up.right") { openDashboard() }
+                Group {
+                    Button("Disconnect account", systemImage: "person.crop.circle.badge.minus") {
+                        Task { await store.disconnect(store.provider) }
+                    }
+                }
+                if store.provider == .codex {
                 Button("OpenAI API usage", systemImage: "chart.bar") { open("https://platform.openai.com/usage") }
                 Button("OpenAI API pricing", systemImage: "dollarsign") { NSWorkspace.shared.open(CodexRateCatalog.sourceURL) }
                 if let date = store.pricingUpdatedAt {
@@ -87,12 +100,13 @@ import SwiftUI
                 Divider()
                 Button("Choose Codex folder…", systemImage: "folder") { chooseFolder() }
                 Button("Show session files in Finder", systemImage: "folder.badge.gearshape") { NSWorkspace.shared.open(store.home) }
+                }
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(0.65)).frame(width: 24, height: 28)
             }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-            .accessibilityLabel("Codex options").help("Refresh, dashboards, pricing, and data source")
+            .accessibilityLabel("Usage options").help("Refresh, dashboards, pricing, and data source")
         }
         .frame(height: 28)
     }
@@ -108,13 +122,14 @@ import SwiftUI
                                 .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
                         } else {
                             LazyVStack(spacing: 12) {
-                                ForEach(quota.windows) { window in
+                                ForEach(quota.windows.filter { store.provider != .antigravity || !$0.id.hasPrefix("codex-") }) { window in
                                     CodexQuotaLane(window: window, now: now, recorded: quota.isLocal)
                                 }
                             }
                         }
                     }
                     .frame(height: 84)
+                    if store.provider == .codex {
                     HStack(spacing: 8) {
                         if let count = quota.resetCount, count > 0 {
                             Button("\(count) reset\(count == 1 ? "" : "s") available", action: openDashboard)
@@ -140,23 +155,29 @@ import SwiftUI
                         }
                     }
                     .font(.system(size: 10)).frame(height: 14)
+                    }
                 }
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(store.isRefreshing ? "Reading your allowance…" : "Connect your Codex session")
+                    Text(store.connecting.contains(store.provider) ? "Complete sign-in in your browser" : store.isRefreshing ? "Reading your allowance…" : "Connect your \(store.provider.accountTitle) account")
                         .font(.system(size: 13, weight: .medium))
-                    Text(store.quotaError ?? "Uses your Codex CLI sign-in. Token history stays on this Mac.")
+                    Text(store.connecting.contains(store.provider) ? store.connectionMessages[store.provider] ?? "Waiting in your browser…" : store.quotaError ?? "Sign in once to see your account’s remaining allowance and reset times.")
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.65))
                         .fixedSize(horizontal: false, vertical: true).lineLimit(3)
                     if !store.isRefreshing {
                         HStack(spacing: 14) {
-                            Button("Choose folder…", action: chooseFolder)
+                            if store.connecting.contains(store.provider) {
+                                Button("Cancel sign-in") { store.cancelSignIn(store.provider) }
+                            } else {
+                                Button("Sign in to \(store.provider.accountTitle)") { store.connect() }
+                            }
                             Button("Open dashboard", action: openDashboard)
                         }.font(.system(size: 11, weight: .medium))
                     }
                 }
                 .frame(height: 96, alignment: .top)
             }
+            if store.provider == .codex {
             HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
                     periodPicker
@@ -164,7 +185,7 @@ import SwiftUI
                         Text(store.isScanning && store.localUpdatedAt == nil ? "…" : CodexTokenTotals.compact(store.total.total))
                             .font(.system(size: 25, weight: .medium, design: .rounded)).monospacedDigit()
                             .contentTransition(.numericText())
-                        Text("tokens").font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+                        Text("local tokens").font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
                     }
                     .help("\(store.total.total.formatted()) local tokens · \(store.fileCount) session files")
                 }
@@ -180,6 +201,12 @@ import SwiftUI
                 .accessibilityLabel("View model usage and API pricing")
             }
             .frame(height: 54)
+            } else {
+                Text("Browser sign-in connects your account. Tokens stay privately on this Mac.")
+                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.65))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(height: 54, alignment: .top)
+            }
         }
         .frame(height: 172, alignment: .top)
         .transition(.opacity)
@@ -274,7 +301,7 @@ import SwiftUI
     }
 
     private func status(now: Date) -> String {
-        if let error = store.localError { return error }
+        if store.provider == .codex, let error = store.localError { return error }
         if let quota = store.quota {
             let age = max(0, Int(now.timeIntervalSince(quota.updatedAt) / 60))
             let time = age < 1 ? "just now" : age < 60 ? "\(age)m ago" : "\(age / 60)h ago"
@@ -282,11 +309,11 @@ import SwiftUI
                 return store.isRefreshing ? "Local reading · refreshing…" : "Local reading · \(time) · refresh unavailable"
             }
             if store.quotaError != nil || age >= 2 { return "Last reading \(time) · refresh needed" }
-            if let error = store.pricingError { return error }
+            if store.provider == .codex, let error = store.pricingError { return error }
             return "Updated \(time)"
         }
         if store.isRefreshing { return "Reading live allowance…" }
-        return store.isScanning ? "Reading token history…" : "Local tokens · account limits unavailable"
+        return store.provider == .codex && store.isScanning ? "Reading token history…" : "Sign in or open account usage"
     }
 
     private func selectModels(_ value: Bool) {
@@ -315,12 +342,12 @@ import SwiftUI
     }
 
     private func open(_ url: String) { if let url = URL(string: url) { NSWorkspace.shared.open(url) } }
-    private func openDashboard() { open("https://chatgpt.com/codex/settings/usage") }
+    private func openDashboard() { NSWorkspace.shared.open(store.provider.dashboard) }
 
     private func chooseFolder() {
         let panel = NSOpenPanel()
         panel.title = "Choose your Codex folder"
-        panel.message = "Select the folder containing auth.json and sessions (usually ~/.codex)."
+        panel.message = "Select the folder containing your token history in sessions (usually ~/.codex)."
         panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.allowsMultipleSelection = false
         panel.showsHiddenFiles = true; panel.directoryURL = store.home
         SharingStateManager.shared.beginInteraction()

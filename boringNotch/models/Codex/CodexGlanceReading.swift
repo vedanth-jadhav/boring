@@ -7,12 +7,13 @@ struct CodexGlanceReading {
     let now: Date
     let hasError: Bool
     var error: String?
+    var providerTitle = "Codex"
 
     var session: CodexQuotaSnapshot.Window? { quota?.windows.first { $0.id == "codex-session" } }
     var weekly: CodexQuotaSnapshot.Window? { quota?.windows.first { $0.id == "codex-weekly" } }
     var recorded: Bool { quota?.isLocal == true || hasError || quota.map { now.timeIntervalSince($0.updatedAt) > 60 } == true }
     var status: String {
-        guard quota != nil else { return hasError ? "Usage unavailable · open Codex to connect" : "Reading Codex usage…" }
+        guard quota != nil else { return hasError ? "Usage unavailable · open AI Usage to connect" : "Reading account usage…" }
         return recorded ? "Saved reading" : "Live allowance"
     }
 
@@ -31,7 +32,12 @@ struct CodexGlanceReading {
     }
 
     func window(for limit: CodexPillLimit) -> CodexQuotaSnapshot.Window? {
-        limit == .session ? session : weekly
+        if let credits = quota?.windows.first(where: { $0.id == "grok-credits" }) { return credits }
+        return limit == .session ? session : weekly
+    }
+
+    func title(for limit: CodexPillLimit) -> String {
+        providerTitle == "Grok" || window(for: limit)?.id == "grok-credits" ? "Credits" : limit.shortTitle
     }
 
     func state(for limit: CodexPillLimit) -> CodexGlanceStatus {
@@ -59,11 +65,16 @@ struct CodexGlanceReading {
 
     func accessibilityLabel(for limit: CodexPillLimit) -> String {
         let window = window(for: limit)
-        return "Codex \(limit.title) allowance. \(remaining(window)) remaining. Reset time \(reset(window)). \(status). \(error ?? "")"
+        return "\(providerTitle) \(title(for: limit)) allowance. \(remaining(window)) remaining. Reset time \(reset(window)). \(status). \(error ?? "")"
     }
 
     var help: String {
-        var lines = ["Codex · \(status)", description(session, title: "5-hour"), description(weekly, title: "Weekly")]
+        var lines = ["\(providerTitle) · \(status)"]
+        if providerTitle == "Grok" {
+            lines.append(description(quota?.windows.first(where: { $0.id == "grok-credits" }), title: "Plan credits"))
+        } else {
+            lines.append(contentsOf: [description(session, title: "5-hour"), description(weekly, title: "Weekly")])
+        }
         if let updated = quota?.updatedAt { lines.append("Last read \(updated.formatted(date: .omitted, time: .standard))") }
         if let error { lines.append(error) }
         lines.append("Click for details or to retry")

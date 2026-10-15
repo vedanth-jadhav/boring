@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Roll the whole reading when a percentage changes into a reset time.
+/// Keep digits alive during countdowns; transition the reading only when its unit changes.
 struct CodexGlanceValue: View {
     let value: String
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -8,14 +8,16 @@ struct CodexGlanceValue: View {
     var body: some View {
         ZStack {
             Text(value)
-                .id(value)
+                .contentTransition(.numericText(countsDown: !value.hasSuffix(" used")))
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: value)
+                .id(value.contains("%"))
                 .transition(reduceMotion ? .opacity : .asymmetric(
-                    insertion: .offset(y: 12).combined(with: .opacity),
-                    removal: .offset(y: -12).combined(with: .opacity)
+                    insertion: .offset(y: 6).combined(with: .opacity),
+                    removal: .offset(y: -6).combined(with: .opacity)
                 ))
         }
         .frame(height: 14)
         .clipped()
-        .animation(reduceMotion ? nil : StandardAnimations.focusTab, value: value)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.28), value: value.contains("%"))
     }
 }

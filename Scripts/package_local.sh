@@ -48,6 +48,8 @@ cp "$binary_dir/CaffeineRecovery" "$app/Contents/MacOS/"
 cp Scripts/caffeine_backstop.sh "$app/Contents/Resources/backstop.sh"
 cp ThirdParty/CaffeineEngine/LICENSE "$app/Contents/Resources/CaffeineEngine-LICENSE"
 cp "$binary_dir/BoringNotchXPCHelper" "$app/Contents/XPCServices/BoringNotchXPCHelper.xpc/Contents/MacOS/"
+export compiler_version
+bash Scripts/package_lyrics_keychain.sh "$app/Contents/XPCServices/LyricsKeychain.xpc" "$identity"
 cp boringNotch/boring.m4a "$app/Contents/Resources/"
 cp THIRD_PARTY_LICENSES "$app/Contents/Resources/"
 cp -R boringNotch/Resources/Romanization "$app/Contents/Resources/"

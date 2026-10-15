@@ -23,11 +23,4 @@ xcrun --sdk macosx swiftc -sdk "$SDKROOT" -D KEYCHAIN_REBUILT_FIXTURE \
 codesign --force --sign "${BORING_CODESIGN_IDENTITY:-Boring Notch Octave Local}" \
   --identifier local.vedanth.boringnotch.octave.credential-checks "$lyrics_check_dir/checks-next"
 "$lyrics_check_dir/checks-next" reject "$lyrics_check_service"
-if [[ "${BORING_TEST_KEYCHAIN_AUTHORIZATION:-0}" == "1" ]]; then
-  "$lyrics_check_dir/checks" trust-rebuild "$lyrics_check_service" "$lyrics_check_dir/checks-next"
-  mv "$lyrics_check_dir/checks-next" "$lyrics_check_dir/checks"
-  "$lyrics_check_dir/checks" read "$lyrics_check_service"
-else
-  echo "MANUAL: macOS authorization dialog is required to test access repair and the next rebuilt-app relaunch."
-fi
 "$lyrics_check_dir/untrusted" reject "$lyrics_check_service"

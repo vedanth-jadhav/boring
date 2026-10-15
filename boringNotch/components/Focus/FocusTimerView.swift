@@ -23,6 +23,7 @@ struct FocusTimerView: View {
                                     Capsule().fill(.orange.opacity(0.15)).matchedGeometryEffect(id: "mode", in: modeNamespace)
                                 }
                             }
+                            .contentShape(Capsule())
                     }
                     .disabled(manager.isActive || manager.isBusy)
                     .accessibilityAddTraits(selection.mode == mode ? .isSelected : [])

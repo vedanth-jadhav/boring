@@ -35,7 +35,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: "General"
         case .notch: "Notch"
-        case .codex: "Codex"
+        case .codex: "AI Usage"
         case .terminal: "Terminal"
         case .appearance: "Appearance"
         case .media: "Media"
@@ -53,7 +53,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: .system("gear")
         case .notch: .custom("notch")
-        case .codex: .system("chart.bar")
+        case .codex: .custom("codex-usage")
         case .terminal: .system("terminal")
         case .appearance: .system("paintbrush")
         case .media: .system("play.rectangle")
@@ -160,7 +160,8 @@ struct SettingsView: View {
                 Image(systemName: imageName)
 
             case .custom(let imageName):
-                Image(imageName)
+                if imageName == "codex-usage" { CodexLogo().frame(width: 18, height: 18) }
+                else { Image(imageName) }
             }
         }
         .tag(tab)

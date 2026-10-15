@@ -76,11 +76,11 @@ final class VolumeManager: NSObject, ObservableObject {
     // MARK: - Public Control API
 
     @MainActor func increase(stepDivisor: Float = 1.0) {
-        adjustInSteps(1, stepDivisor: stepDivisor)
+        withInitialDeviceState { self.adjustInSteps(1, stepDivisor: stepDivisor) }
     }
 
     @MainActor func decrease(stepDivisor: Float = 1.0) {
-        adjustInSteps(-1, stepDivisor: stepDivisor)
+        withInitialDeviceState { self.adjustInSteps(-1, stepDivisor: stepDivisor) }
     }
 
     @MainActor private func adjustInSteps(_ direction: Float32, stepDivisor: Float) {
@@ -89,6 +89,10 @@ final class VolumeManager: NSObject, ObservableObject {
     }
 
     @MainActor func toggleMuteAction() {
+        withInitialDeviceState { self.toggleMute() }
+    }
+
+    @MainActor private func toggleMute() {
         let willBeMuted = !isMuted
         let resultingVolume: Float32 = rawVolume > 0.001 ? rawVolume : previousVolumeBeforeMute
 
@@ -116,7 +120,22 @@ final class VolumeManager: NSObject, ObservableObject {
     }
 
     @MainActor func setAbsolute(_ value: Float32) {
-        commit(target: max(0, min(1, value)))
+        withInitialDeviceState { self.commit(target: max(0, min(1, value))) }
+    }
+
+    @MainActor private func withInitialDeviceState(_ action: @escaping @MainActor () -> Void) {
+        if didInitialFetch {
+            action()
+            return
+        }
+        // First-use controls must follow the queued device read and its main-thread publication.
+        let readyAction: @MainActor @Sendable () -> Void = { [self] in
+            guard didInitialFetch else { return }
+            action()
+        }
+        audioQueue.async {
+            DispatchQueue.main.async(execute: readyAction)
+        }
     }
 
     /// Shared by keys and slider: optimistically publishes the intent (the
@@ -273,9 +292,11 @@ final class VolumeManager: NSObject, ObservableObject {
         // The initial fetch arms change detection without touching the date;
         // only later device-reported changes bring the OSD up.
         if changed && didInitialFetch { lastChangeAt = Date() }
-        if let volume { rawVolume = volume }
+        if let volume {
+            rawVolume = volume
+            didInitialFetch = true
+        }
         isMuted = effectiveMuted
-        didInitialFetch = true
     }
 
     // MARK: - CoreAudio Primitives (audioQueue, snapshot-backed)

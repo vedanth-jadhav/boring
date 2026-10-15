@@ -34,7 +34,7 @@ let package = Package(
                 .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
                 .product(name: "Defaults", package: "Defaults")
             ], path: ".", exclude: [
-                "BoringNotchXPCHelper", "boringNotchTests", "Configuration", "Scripts", "ThirdParty", "CaffeineRecovery",
+                "BoringNotchXPCHelper", "boringNotchTests", "Configuration", "Scripts", "ThirdParty", "CaffeineRecovery", "LyricsKeychainHelper",
                 "mediaremote-adapter", "octave-brave-extension", "updater", ".github", "build",
                 "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", "LICENSE", "README.md",
                 "SECURITY.md", "THIRD_PARTY_LICENSES", "crowdin.yml", "LOCAL_OCTAVE.md", "dist",

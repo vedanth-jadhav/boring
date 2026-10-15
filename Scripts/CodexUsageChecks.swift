@@ -24,6 +24,31 @@ import Foundation
         defer { try? fm.removeItem(at: home) }
         try fm.createDirectory(at: home.appendingPathComponent("sessions"), withIntermediateDirectories: true)
         let now = Date()
+        let claude = AIUsageParser.claude(["five_hour": ["utilization": 25.0, "resets_at": now.addingTimeInterval(60).ISO8601Format()],
+                                           "seven_day": ["utilization": 61.0]], at: now)!
+        expect(claude.windows.first?.remaining == 75, "Claude usage means consumed allowance, not remaining")
+        expect(claude.windows.last?.id == "codex-weekly", "Claude weekly limits must work in the glance")
+        expect(AIUsageParser.claude(["five_hour": ["utilization": -1.0]], at: now) == nil, "Malformed Claude usage cannot become a valid allowance")
+        let buckets: [[String: Any]] = [["id": "weekly", "name": "Weekly", "window": "weekly", "remaining_fraction": 0.8],
+                                        ["id": "session", "window": "5h", "remaining_fraction": 0.3],
+                                        ["id": "invalid", "remaining_fraction": 1.2]]
+        let antiJSON: [String: Any] = ["status": "SUCCESS", "command": ["name": "usage", "data": ["groups": [["name": "Gemini", "buckets": buckets],
+                                         ["name": "Claude", "buckets": [["id": "other", "window": "5h", "remaining_fraction": 0.1]]]]]]]
+        let anti = AIUsageParser.antigravity(antiJSON, at: now)!
+        expect(anti.windows.count == 5, "Antigravity rejects invalid buckets and supplies two glance windows")
+        expect(anti.windows.first(where: { $0.id == "codex-session" })?.usedPercent == 90, "Glance must show the most constrained model family")
+        expect(AIUsageParser.antigravity(["status": "FAILURE"], at: now) == nil, "A failed CLI command must not look like a fresh quota")
+        expect(AIUsageParser.grokCredits(["config": [:]], at: now) == nil, "Missing Grok usage must never imply zero usage")
+        expect(AIUsageParser.grokCredits(["config": ["creditUsagePercent": Double.nan]], at: now) == nil, "Non-finite Grok usage must be rejected")
+        expect(AIUsageParser.grokCredits(["config": ["creditUsagePercent": 40.0]], at: now)?.windows.first?.remaining == 60, "Grok reports plan credits separately from session limits")
+
+        let remote = AIUsageParser.antigravityRemote(["groups": [["displayName": "Gemini", "buckets": [["bucketId": "weekly", "window": "weekly", "remainingFraction": 0.4, "resetTime": now.addingTimeInterval(100).ISO8601Format()]]]]], at: now)!
+        expect(remote.windows.first?.usedPercent == 60, "Remote Antigravity fields must preserve consumed quota")
+        expect(AIUsageParser.antigravityRemote(["groups": [["buckets": [["bucketId": "unknown", "window": "unknown", "remainingFraction": 0.8]]]]], at: now) == nil, "Unknown quota cadences must not masquerade as 5-hour windows")
+        let grokQuota = AIUsageParser.grokCredits(["config": ["creditUsagePercent": 40.0]], at: now)!
+        let grokReading = CodexGlanceReading(quota: grokQuota, now: now, hasError: false, providerTitle: "Grok")
+        expect(grokReading.title(for: .session) == "Credits" && grokReading.value(for: .weekly, metric: .remaining) == "60%", "Grok credit usage must not be labeled as a 5-hour or weekly allowance")
+        print("PASS: Claude, Antigravity, Grok parser validation")
         let sessionWindow = CodexQuotaSnapshot.Window(id: "codex-session", title: "5-hour", usedPercent: 37,
                                                       resetsAt: now.addingTimeInterval(120))
         let weeklyWindow = CodexQuotaSnapshot.Window(id: "codex-weekly", title: "Weekly", usedPercent: 9,
@@ -114,10 +139,8 @@ import Foundation
         if CommandLine.arguments.contains("--live") {
             let realHome = fm.homeDirectoryForCurrentUser.appendingPathComponent(".codex")
             let client = CodexUsageClient()
-            let credentials = try await client.credentials(home: realHome)
-            let live = try await client.quota(credentials: credentials)
             let prices = try await client.pricing(force: true)
-            print("LIVE: \(live.windows.count) quota windows; \(live.resetCount ?? 0) resets available; \(prices.rates.count) exact published rates")
+            print("LIVE: \(prices.rates.count) exact published rates; account limits require interactive sign-in")
             let start = Date()
             let local = try await CodexLogScanner().scan(home: realHome)
             print("SCAN: \(local.fileCount) recent files; \(total(local).total) tokens; \(String(format: "%.2f", Date().timeIntervalSince(start))) seconds")

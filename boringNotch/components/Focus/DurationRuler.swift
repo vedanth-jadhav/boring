@@ -39,6 +39,7 @@ struct DurationRuler: View {
             .scrollIndicators(.hidden)
             .modifier(CenteredRulerSnapping())
             .scrollPosition(id: $position, anchor: .center)
+            .frame(height: 54)
             .introspect(.scrollView, on: .macOS(.v14...)) { scrollView in
                 mouseDrag.scrollView = scrollView
                 scrollView.hasHorizontalScroller = false
@@ -46,18 +47,6 @@ struct DurationRuler: View {
                 scrollView.drawsBackground = false
 
             }
-            .simultaneousGesture(DragGesture(minimumDistance: 1)
-                .onChanged {
-                    if let minute = mouseDrag.move(translation: $0.translation.width, tickSpacing: tickSpacing) {
-                        minutes = minute
-                    }
-                }
-                .onEnded { _ in
-                    guard let minute = mouseDrag.end(tickSpacing: tickSpacing) else { return }
-                    withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.28, dampingFraction: 0.94)) {
-                        position = minute
-                    }
-                })
             .overlay(alignment: .bottom) {
                 VStack(spacing: 3) {
                     Capsule().fill(.orange).frame(width: 2, height: 26)
@@ -70,8 +59,19 @@ struct DurationRuler: View {
             .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.12),
                                        .init(color: .black, location: 0.88), .init(color: .clear, location: 1)],
                                  startPoint: .leading, endPoint: .trailing))
+            .overlay {
+                RulerInputSurface(input: mouseDrag, tickSpacing: tickSpacing) { minute in
+                    minutes = minute
+                } onEnd: { minute in
+                    withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.28, dampingFraction: 0.94)) {
+                        position = minute
+                    }
+                }
+                .accessibilityHidden(true)
+            }
         }
         .frame(height: 54)
+        .onDisappear { mouseDrag.cancelDrag() }
         .onChange(of: position) { _, minute in
             guard let minute, minutes != minute else { return }
             minutes = minute

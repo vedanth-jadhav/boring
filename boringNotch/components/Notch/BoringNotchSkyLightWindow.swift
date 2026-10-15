@@ -165,10 +165,12 @@ class BoringNotchSkyLightWindow: NSPanel {
 
     override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
         let accepted = super.makeFirstResponder(responder)
-        if accepted, let view = responder as? NSView,
-           view is NSTextField || view is NSTextInputClient {
+        if accepted, let view = responder as? NSView {
             let input = (view as? NSTextView).flatMap { $0.isFieldEditor ? $0.delegate as? NSView : nil } ?? view
-            keyboardFocus.becameFirstResponder(input, in: self)
+            if input !== contentView,
+               input is NSTextField || (input is NSTextInputClient && input.needsPanelToBecomeKey) {
+                keyboardFocus.becameFirstResponder(input, in: self)
+            }
         }
         return accepted
     }

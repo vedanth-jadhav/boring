@@ -10,3 +10,4 @@ trap 'rm -rf "$caffeine_input_dir"' EXIT
   boringNotch/components/Focus/CaffeineSearchField.swift Scripts/CaffeineInputChecks.swift \
   -o "$caffeine_input_dir/checks"
 "$caffeine_input_dir/checks"
+bash Scripts/test_caffeine_panel.sh
