@@ -38,6 +38,8 @@ actor CodexLogScanner {
 
     private var cache: Cache?
     private var cacheURL: URL?
+    private var lastReport: Report?
+    private var lastReportCutoff: Date?
     private let tokenMarker = Data("\"token_count\"".utf8)
     private let contextMarker = Data("\"turn_context\"".utf8)
     private let metaMarker = Data("\"session_meta\"".utf8)
@@ -72,29 +74,50 @@ actor CodexLogScanner {
                 paths.append((url, size, modified, (attrs[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0))
             }
         }
+        if let lastReport, lastReportCutoff == cutoff,
+           report.unreadableCount == 0, lastReport.unreadableCount == 0,
+           current.files.count == paths.count,
+           paths.allSatisfy({ url, size, modified, inode in
+               guard let state = current.files[url.path] else { return false }
+               return state.size == size && state.modified == modified && state.inode == inode
+           }) {
+            return lastReport
+        }
+        lastReport = nil
         paths.sort { $0.2 > $1.2 }
         let retainedPaths = Set(paths.map { $0.0.path })
+        var cacheChanged = current.files.keys.contains { !retainedPaths.contains($0) }
         current.files = current.files.filter { retainedPaths.contains($0.key) }
         var sessionIDs = Set<String>()
         defer {
             cache = current
-            if let cacheURL, let data = try? JSONEncoder().encode(current) {
+            if cacheChanged, let cacheURL, let data = try? JSONEncoder().encode(current) {
                 try? data.write(to: cacheURL, options: [.atomic])
                 try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: cacheURL.path)
             }
         }
         for (url, size, modified, inode) in paths {
             try Task.checkCancellation()
-            var state = current.files[url.path] ?? FileState()
+            let savedState = current.files[url.path]
+            var state = savedState ?? FileState()
             if state.inode != inode || size < state.offset || (size == state.size && modified != state.modified) {
                 state = FileState()
             }
-            state.daily = state.daily.filter { String($0.key.prefix(10)) >= oldestDay }
+            let retainedDaily = state.daily.filter { String($0.key.prefix(10)) >= oldestDay }
+            if retainedDaily.count != state.daily.count {
+                state.daily = retainedDaily
+                current.files[url.path] = state
+                cacheChanged = true
+            }
             if size != state.size || modified != state.modified || state.offset < size {
                 do {
+                    let metadataChanged = savedState == nil || state.size != size
+                        || state.modified != modified || state.inode != inode
+                    let previousOffset = state.offset
                     try await read(url: url, state: &state, cutoff: cutoff)
                     state.size = size; state.modified = modified; state.inode = inode
                     current.files[url.path] = state
+                    cacheChanged = cacheChanged || metadataChanged || state.offset != previousOffset
                 } catch is CancellationError { throw CancellationError() }
                 catch { report.unreadableCount += 1; continue }
             }
@@ -103,12 +126,16 @@ actor CodexLogScanner {
             for (key, tokens) in state.daily { report.daily[key, default: CodexTokenTotals()].add(tokens) }
             if let quota = state.quota, quota.updatedAt > (report.quota?.updatedAt ?? .distantPast) { report.quota = quota }
         }
+        lastReport = report
+        lastReportCutoff = cutoff
         return report
     }
 
     private func loadCache(home: URL) {
         let timezone = TimeZone.current.identifier
         if cache?.home == home.path && cache?.timezone == timezone { return }
+        lastReport = nil
+        lastReportCutoff = nil
         let digest = SHA256.hash(data: Data(home.path.utf8)).map { String(format: "%02x", $0) }.joined()
         let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("local.vedanth.boringnotch.octave/Codex", isDirectory: true)

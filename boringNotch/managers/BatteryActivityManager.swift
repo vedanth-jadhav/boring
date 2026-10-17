@@ -9,34 +9,8 @@ final class BatteryActivityManager {
 
     private var batterySource: CFRunLoopSource?
     private var observers: [(BatteryEvent) -> Void] = []
+    private var snapshotObservers: [(BatteryInfo) -> Void] = []
     private var previousBatteryInfo: BatteryInfo?
-    // actor-based queue to serialize notification delivery
-    private let notificationQueueActor = NotificationQueue()
-
-    /// An actor responsible for serializing and delivering events with a 1‑second delay.
-    private actor NotificationQueue {
-        private var queue: [BatteryEvent] = []
-        private var processing = false
-
-        /// Enqueue an event; the `deliver` closure is always invoked on the main actor.
-        func enqueue(_ event: BatteryEvent, deliver: @MainActor @escaping (BatteryEvent) -> Void) {
-            queue.append(event)
-            if !processing {
-                processing = true
-                Task { await process(deliver: deliver) }
-            }
-        }
-
-        private func process(deliver: @MainActor @escaping (BatteryEvent) -> Void) async {
-            while !queue.isEmpty {
-                let event = queue.removeFirst()
-                // pause between notifications
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                await deliver(event)
-            }
-            processing = false
-        }
-    }
 
     enum BatteryEvent {
         case powerSourceChanged(isPluggedIn: Bool)
@@ -66,9 +40,11 @@ final class BatteryActivityManager {
         timeToDischarge: 0
     )
 
-    private init() {
-        startMonitoring()
-        setupLowPowerModeObserver()
+    init(startMonitoring: Bool = true) {
+        if startMonitoring {
+            self.startMonitoring()
+            setupLowPowerModeObserver()
+        }
     }
 
     /// Setup observer for low power mode changes
@@ -107,93 +83,65 @@ final class BatteryActivityManager {
         }
     }
 
-    /// Checks for changes in a property and notifies observers
-    private func checkAndNotify<T: Equatable>(
-        previous: T,
-        current: T,
-        eventGenerator: (T) -> BatteryEvent
-    ) {
-        if previous != current {
-            enqueueNotification(eventGenerator(current))
-        }
-    }
-
     /// Notifies the observers of battery changes
     /// Checks for changes in battery status and notifies observers
     private func notifyBatteryChanges() {
-        let batteryInfo = getBatteryInfo()
-
-        // Check for changes
-        if let previousInfo = previousBatteryInfo {
-            // Usar la función auxiliar para cada propiedad
-            checkAndNotify(
-                previous: previousInfo.isPluggedIn,
-                current: batteryInfo.isPluggedIn,
-                eventGenerator: { .powerSourceChanged(isPluggedIn: $0) }
-            )
-
-            checkAndNotify(
-                previous: previousInfo.currentCapacity,
-                current: batteryInfo.currentCapacity,
-                eventGenerator: { .batteryLevelChanged(level: $0) }
-            )
-
-            checkAndNotify(
-                previous: previousInfo.isCharging,
-                current: batteryInfo.isCharging,
-                eventGenerator: { .isChargingChanged(isCharging: $0) }
-            )
-
-            checkAndNotify(
-                previous: previousInfo.isInLowPowerMode,
-                current: batteryInfo.isInLowPowerMode,
-                eventGenerator: { .lowPowerModeChanged(isEnabled: $0) }
-            )
-
-            checkAndNotify(
-                previous: previousInfo.timeToFullCharge,
-                current: batteryInfo.timeToFullCharge,
-                eventGenerator: { .timeToFullChargeChanged(time: $0) }
-            )
-
-            checkAndNotify(
-                previous: previousInfo.timeToDischarge,
-                current: batteryInfo.timeToDischarge,
-                eventGenerator: { .timeToDischargeChanged(time: $0) }
-            )
-
-            checkAndNotify(
-                previous: previousInfo.maxCapacity,
-                current: batteryInfo.maxCapacity,
-                eventGenerator: { .maxCapacityChanged(capacity: $0) }
-            )
-
-            checkAndNotify(
-                previous: previousInfo.maxAdapterWatts,
-                current: batteryInfo.maxAdapterWatts,
-                eventGenerator: { .adapterWattageChanged(watts: $0) }
-            )
-        } else {
-            // First time notification
-            enqueueNotification(.powerSourceChanged(isPluggedIn: batteryInfo.isPluggedIn))
-            enqueueNotification(.batteryLevelChanged(level: batteryInfo.currentCapacity))
-            enqueueNotification(.isChargingChanged(isCharging: batteryInfo.isCharging))
-            enqueueNotification(.lowPowerModeChanged(isEnabled: batteryInfo.isInLowPowerMode))
-            enqueueNotification(.timeToFullChargeChanged(time: batteryInfo.timeToFullCharge))
-            enqueueNotification(.timeToDischargeChanged(time: batteryInfo.timeToDischarge))
-            enqueueNotification(.maxCapacityChanged(capacity: batteryInfo.maxCapacity))
-            enqueueNotification(.adapterWattageChanged(watts: batteryInfo.maxAdapterWatts))
-        }
-
-        // Update previous battery info
-        previousBatteryInfo = batteryInfo
+        processBatteryInfo(getBatteryInfo())
     }
 
-    /// Enqueues a notification to be processed using the concurrency-based queue actor.
-    private func enqueueNotification(_ event: BatteryEvent) {
-        Task { @MainActor in
-            await notificationQueueActor.enqueue(event) { [weak self] ev in
-                self?.notifyObservers(event: ev)
+    /// Publishes all changes from one IOKit sample as a coherent main-thread batch.
+    /// Kept internal so regression checks can feed synthetic values without touching hardware.
+    func processBatteryInfo(_ batteryInfo: BatteryInfo) {
+        let previous = previousBatteryInfo
+        previousBatteryInfo = batteryInfo
+
+        var changedEvents: [BatteryEvent] = []
+        if let previous {
+            if previous.isPluggedIn != batteryInfo.isPluggedIn {
+                changedEvents.append(.powerSourceChanged(isPluggedIn: batteryInfo.isPluggedIn))
+            }
+            if previous.currentCapacity != batteryInfo.currentCapacity {
+                changedEvents.append(.batteryLevelChanged(level: batteryInfo.currentCapacity))
+            }
+            if previous.isCharging != batteryInfo.isCharging {
+                changedEvents.append(.isChargingChanged(isCharging: batteryInfo.isCharging))
+            }
+            if previous.isInLowPowerMode != batteryInfo.isInLowPowerMode {
+                changedEvents.append(.lowPowerModeChanged(isEnabled: batteryInfo.isInLowPowerMode))
+            }
+            if previous.timeToFullCharge != batteryInfo.timeToFullCharge {
+                changedEvents.append(.timeToFullChargeChanged(time: batteryInfo.timeToFullCharge))
+            }
+            if previous.timeToDischarge != batteryInfo.timeToDischarge {
+                changedEvents.append(.timeToDischargeChanged(time: batteryInfo.timeToDischarge))
+            }
+            if previous.maxCapacity != batteryInfo.maxCapacity {
+                changedEvents.append(.maxCapacityChanged(capacity: batteryInfo.maxCapacity))
+            }
+            if previous.maxAdapterWatts != batteryInfo.maxAdapterWatts {
+                changedEvents.append(.adapterWattageChanged(watts: batteryInfo.maxAdapterWatts))
+            }
+        } else {
+            changedEvents = [
+                .powerSourceChanged(isPluggedIn: batteryInfo.isPluggedIn),
+                .batteryLevelChanged(level: batteryInfo.currentCapacity),
+                .isChargingChanged(isCharging: batteryInfo.isCharging),
+                .lowPowerModeChanged(isEnabled: batteryInfo.isInLowPowerMode),
+                .timeToFullChargeChanged(time: batteryInfo.timeToFullCharge),
+                .timeToDischargeChanged(time: batteryInfo.timeToDischarge),
+                .maxCapacityChanged(capacity: batteryInfo.maxCapacity),
+                .adapterWattageChanged(watts: batteryInfo.maxAdapterWatts),
+            ]
+        }
+
+        guard !changedEvents.isEmpty else { return }
+        let events = changedEvents
+        let currentSnapshotObservers = snapshotObservers
+        let currentObservers = observers
+        DispatchQueue.main.async {
+            for observer in currentSnapshotObservers { observer(batteryInfo) }
+            for event in events {
+                for observer in currentObservers { observer(event) }
             }
         }
     }
@@ -336,6 +284,12 @@ final class BatteryActivityManager {
         return observers.count - 1
     }
 
+    /// Adds one callback per physical snapshot, alongside the legacy per-property observer API.
+    func addSnapshotObserver(_ observer: @escaping (BatteryInfo) -> Void) -> Int {
+        snapshotObservers.append(observer)
+        return snapshotObservers.count - 1
+    }
+
     /// Removes an observer by its ID
     /// - Parameter id: The ID of the observer to be removed
     func removeObserver(byId id: Int) {
@@ -343,15 +297,9 @@ final class BatteryActivityManager {
         observers.remove(at: id)
     }
 
-    /// Notifies all observers of a battery event
-    /// - Parameter event: The battery event to notify
-    private func notifyObservers(event: BatteryEvent) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            for observer in self.observers {
-                observer(event)
-            }
-        }
+    func removeSnapshotObserver(byId id: Int) {
+        guard id >= 0 && id < snapshotObservers.count else { return }
+        snapshotObservers.remove(at: id)
     }
 
     deinit {

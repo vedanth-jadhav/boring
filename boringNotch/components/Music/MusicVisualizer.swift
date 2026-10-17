@@ -13,6 +13,8 @@ class MusicVisualizerModel: NSView, AudioCaptureLevelsConsumer {
     private var barLayers: [CAGradientLayer] = []
     private var isPlaying = false
     private var useRealtime = false
+    private var wantsRealtime = false
+    private var reduceMotion = false
     private var tintColor: NSColor = .systemBlue
     private var lastTintColor: NSColor?
 
@@ -68,13 +70,23 @@ class MusicVisualizerModel: NSView, AudioCaptureLevelsConsumer {
         let visible = window?.occlusionState.contains(.visible) == true && !isHiddenOrHasHiddenAncestor
         guard visibleConsumer != visible else { return }
         visibleConsumer = visible
-        if visible {
-            attachedManager?.setLevelsConsumer(self)
-            if isPlaying && !useRealtime { startRandomAnimating() }
-        } else {
+        updateAudioConsumer()
+        if visible && isPlaying && !useRealtime && !reduceMotion { startRandomAnimating() }
+        else { stopRandomAnimating() }
+    }
+
+    private func updateAudioConsumer() {
+        guard visibleConsumer, isPlaying, wantsRealtime else {
             attachedManager?.clearLevelsConsumer(self)
-            stopRandomAnimating()
+            return
         }
+        attachedManager?.setLevelsConsumer(self)
+    }
+
+    func setCaptureDemand(_ enabled: Bool) {
+        guard wantsRealtime != enabled else { return }
+        wantsRealtime = enabled
+        updateAudioConsumer()
     }
 
     func detach() {
@@ -132,6 +144,7 @@ class MusicVisualizerModel: NSView, AudioCaptureLevelsConsumer {
     }
 
     private func startRandomAnimating() {
+        guard !reduceMotion else { return }
         for (index, barLayer) in barLayers.enumerated() {
             animateBar(barLayer, delay: Double(index) * 0.08)
         }
@@ -177,19 +190,42 @@ class MusicVisualizerModel: NSView, AudioCaptureLevelsConsumer {
     func setPlaying(_ playing: Bool) {
         guard isPlaying != playing else { return }
         isPlaying = playing
+        updateAudioConsumer()
         if playing {
-            expandBars(animated: true)
+            expandBars(animated: !reduceMotion)
             if !useRealtime {
                 startRandomAnimating()
             }
         } else {
-            collapseBarsToDots()
+            stopRandomAnimating()
+            if reduceMotion {
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                for (index, barLayer) in barLayers.enumerated() {
+                    barLayer.transform = CATransform3DIdentity
+                    applyFrame(to: barLayer, at: index, height: barWidth)
+                }
+                CATransaction.commit()
+            } else {
+                collapseBarsToDots()
+            }
+        }
+    }
+
+    func setReduceMotion(_ enabled: Bool) {
+        guard reduceMotion != enabled else { return }
+        reduceMotion = enabled
+        if enabled {
+            stopRandomAnimating()
+        } else if visibleConsumer && isPlaying && !useRealtime {
+            startRandomAnimating()
         }
     }
 
     func setUseRealtime(_ enabled: Bool) {
         guard useRealtime != enabled else { return }
         useRealtime = enabled
+        updateAudioConsumer()
         // Force the next incoming frame through the threshold guard.
         for i in 0..<lastAppliedLevels.count { lastAppliedLevels[i] = -1 }
         guard isPlaying else { return }
@@ -202,7 +238,7 @@ class MusicVisualizerModel: NSView, AudioCaptureLevelsConsumer {
                 barLayer.transform = CATransform3DMakeScale(1.0, Self.idleBarScale, 1.0)
             }
             CATransaction.commit()
-            startRandomAnimating()
+            if visibleConsumer { startRandomAnimating() }
         }
     }
 
@@ -210,7 +246,7 @@ class MusicVisualizerModel: NSView, AudioCaptureLevelsConsumer {
         guard attachedManager !== manager else { return }
         attachedManager?.clearLevelsConsumer(self)
         attachedManager = manager
-        if visibleConsumer { manager.setLevelsConsumer(self) }
+        updateAudioConsumer()
     }
 
     func syncCurrentLevels(from manager: AudioCaptureManager) {
@@ -262,6 +298,7 @@ struct MusicVisualizer: NSViewRepresentable {
     let tintColor: Color
     @Default(.realtimeAudioWaveform) var realtimeEnabled: Bool
     @ObservedObject private var audioCapture = AudioCaptureManager.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static func dismantleNSView(_ nsView: MusicVisualizerModel, coordinator: ()) {
         nsView.detach()
@@ -270,6 +307,8 @@ struct MusicVisualizer: NSViewRepresentable {
     func makeNSView(context: Context) -> MusicVisualizerModel {
         let spectrum = MusicVisualizerModel()
         spectrum.setTintColor(NSColor(tintColor))
+        spectrum.setReduceMotion(reduceMotion)
+        spectrum.setCaptureDemand(realtimeEnabled)
         spectrum.setUseRealtime(realtimeEnabled && audioCapture.isCapturing)
         spectrum.setPlaying(isPlaying)
         spectrum.attach(to: audioCapture)
@@ -279,6 +318,8 @@ struct MusicVisualizer: NSViewRepresentable {
 
     func updateNSView(_ nsView: MusicVisualizerModel, context: Context) {
         nsView.setTintColor(NSColor(tintColor))
+        nsView.setReduceMotion(reduceMotion)
+        nsView.setCaptureDemand(realtimeEnabled)
         nsView.setUseRealtime(realtimeEnabled && audioCapture.isCapturing)
         nsView.setPlaying(isPlaying)
         nsView.syncCurrentLevels(from: audioCapture)

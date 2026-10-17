@@ -19,7 +19,9 @@ final class BrightnessManager: ObservableObject {
 	/// no press is lost — each press used to trigger its own 3-RPC sequence
 	/// (adjust + read + display lookup), and they would queue behind each other.
 	private var pendingDelta: Float = 0
+	private var pendingTarget: Float?
 	private var flushTask: Task<Void, Never>?
+	private var changeGeneration = 0
 
 	/// The brightness target display only changes with the display set.
 	private var cachedTargetUUID: String?
@@ -56,55 +58,74 @@ final class BrightnessManager: ObservableObject {
 
 	func refresh() {
 		Task { @MainActor in
-			if let current = await client.currentScreenBrightness() {
+			guard flushTask == nil else { return }
+			let generation = changeGeneration
+			if let current = await client.currentScreenBrightness(),
+			   flushTask == nil, generation == changeGeneration {
 				publish(brightness: current, touchDate: false)
 			}
 		}
 	}
 
 	@MainActor func setRelative(delta: Float) {
-		pendingDelta += delta
+		changeGeneration += 1
+		if let target = pendingTarget {
+			pendingTarget = max(0, min(1, target + delta))
+		} else {
+			pendingDelta += delta
+		}
+		flushPendingChanges()
+	}
+
+	@MainActor func setAbsolute(value: Float) {
+		changeGeneration += 1
+		let clamped = max(0, min(1, value))
+		pendingTarget = clamped
+		pendingDelta = 0
+		publish(brightness: clamped, touchDate: true)
+		flushPendingChanges()
+	}
+
+	@MainActor private func flushPendingChanges() {
 		guard flushTask == nil else { return }
 		flushTask = Task { @MainActor in
-			defer { flushTask = nil }
-			while pendingDelta != 0 {
+			var needsRefresh = false
+			defer {
+				flushTask = nil
+				if needsRefresh { refresh() }
+			}
+			while pendingTarget != nil || pendingDelta != 0 {
+				// Bound slider writes to 15 Hz and retain the final target.
+				try? await Task.sleep(for: .milliseconds(67))
+				let target = pendingTarget
 				let delta = pendingDelta
+				pendingTarget = nil
 				pendingDelta = 0
-				// One RPC delivers both the adjustment and the resulting value.
-				guard let current = await client.adjustScreenBrightness(by: delta) else {
-					refresh()
-					return
+				let current: Float?
+				if let target {
+					current = await client.setScreenBrightness(target) ? target : nil
+				} else {
+					current = await client.adjustScreenBrightness(by: delta)
 				}
-				publish(brightness: current, touchDate: true)
-
-				let uuid = await brightnessTargetUUID()
-				NotchUIEventBus.events.send(.sneakPeek(type: .brightness, value: CGFloat(current), targetScreenUUID: uuid))
+				guard pendingTarget == nil, pendingDelta == 0 else { continue }
+				if let current {
+					needsRefresh = false
+					publish(brightness: current, touchDate: true)
+					let uuid = await brightnessTargetUUID()
+					guard pendingTarget == nil, pendingDelta == 0 else { continue }
+					NotchUIEventBus.events.send(.sneakPeek(type: .brightness, value: CGFloat(current), targetScreenUUID: uuid))
+				} else {
+					needsRefresh = true
+				}
 			}
 		}
 	}
 
-	func setAbsolute(value: Float) {
-		let clamped = max(0, min(1, value))
-		Task { @MainActor in
-			let ok = await client.setScreenBrightness(clamped)
-			if ok {
-				publish(brightness: clamped, touchDate: true)
-                // optionally show peek when user uses slider/controls
-                let targetUUID = await brightnessTargetUUID()
-                NotchUIEventBus.events.send(.sneakPeek(type: .brightness, value: CGFloat(clamped), targetScreenUUID: targetUUID))
-			} else {
-				refresh()
-			}
-		}
-	}
-
-	private func publish(brightness: Float, touchDate: Bool) {
-		DispatchQueue.main.async {
-			if self.rawBrightness != brightness || touchDate {
-				if touchDate { self.lastChangeAt = Date() }
-				self.rawBrightness = brightness
-				self.animatedBrightness = brightness
-			}
+	@MainActor private func publish(brightness: Float, touchDate: Bool) {
+		if rawBrightness != brightness || touchDate {
+			if touchDate { lastChangeAt = Date() }
+			rawBrightness = brightness
+			animatedBrightness = brightness
 		}
 	}
 }

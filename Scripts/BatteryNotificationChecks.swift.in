@@ -1,0 +1,100 @@
+import AppKit
+import SwiftUI
+
+// Only the battery button is isolated; the row and width come from ContentView.
+private struct BoringBatteryView: View {
+    var batteryWidth: CGFloat
+    var isCharging: Bool
+    var isInLowPowerMode: Bool
+    var isPluggedIn: Bool
+    var levelBattery: Float
+    var maxAdapterWatts: Int
+    var isForNotification: Bool
+    var body: some View {
+        HStack {
+            Text("100%")
+            Color.green.frame(width: batteryWidth, height: 12)
+        }
+    }
+}
+
+private struct BatteryFixture {
+    var statusText: LocalizedStringKey
+    let isCharging = true
+    let isInLowPowerMode = false
+    let isPluggedIn = true
+    let levelBattery: Float = 100
+    let maxAdapterWatts = 140
+}
+
+private struct ViewModelFixture { let closedNotchSize: CGSize }
+private let cornerRadiusInsets = (closed: (top: CGFloat(6), bottom: CGFloat(14)), opened: (top: CGFloat(19), bottom: CGFloat(32)))
+
+private final class CameraSpacerView: NSView {}
+
+private struct CenterProbe: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { CameraSpacerView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private struct NotificationFixture: View {
+    let vm: ViewModelFixture
+    let batteryModel: BatteryFixture
+    let topCornerRadius: CGFloat
+    let displayClosedNotchHeight: CGFloat = 32
+    __SIDE_WIDTH__
+
+    func width() -> CGFloat {
+        var chinWidth = vm.closedNotchSize.width
+        __WIDTH__
+        return chinWidth
+    }
+
+    var body: some View {
+        notification
+            .padding(.horizontal, max(0, cornerRadiusInsets.closed.bottom - topCornerRadius))
+            .padding(.horizontal, topCornerRadius)
+            .frame(width: width(), height: displayClosedNotchHeight)
+    }
+
+    private var notification: some View {
+        __ROW__
+    }
+}
+
+@main private struct BatteryNotificationChecks {
+    @MainActor static func probes(in view: NSView) -> [NSView] {
+        view.subviews.flatMap { child in
+            child is CameraSpacerView
+                ? [child] : probes(in: child)
+        }
+    }
+
+    @MainActor static func main() {
+        _ = NSApplication.shared
+        NSApp.setActivationPolicy(.prohibited)
+        let statuses = ["Plugged In", "Unplugged", "Charging battery", "Not charging", "Full charge", "Low Power: On", "Low Power: Off"]
+        for notchWidth: CGFloat in [185, 200, 240] {
+            for radius: CGFloat in [4, 6, 18] {
+                for status in statuses {
+                    let fixture = NotificationFixture(
+                        vm: ViewModelFixture(closedNotchSize: CGSize(width: notchWidth, height: 32)),
+                        batteryModel: BatteryFixture(statusText: LocalizedStringKey(status)), topCornerRadius: radius)
+                    precondition(fixture.width() <= notchWidth + 260, "Battery notice must add compact wings rather than force the open-panel width")
+                    let host = NSHostingView(rootView: fixture)
+                    let window = NSWindow(contentRect: NSRect(x: -5000, y: -5000, width: fixture.width(), height: 32), styleMask: .borderless, backing: .buffered, defer: false)
+                    window.isReleasedWhenClosed = false
+                    window.contentView = host
+                    window.orderFront(nil)
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+                    guard let center = probes(in: host).first else { fatalError("Camera spacer probe missing") }
+                    let rect = center.convert(center.bounds, to: host)
+                    precondition(abs(rect.width - notchWidth) < 1, "Camera spacer must match this display's notch")
+                    precondition(abs(rect.midX - fixture.width() / 2) < 1, "Status and battery must leave the camera spacer centered")
+                    window.orderOut(nil)
+                }
+            }
+        }
+        print("PASS: 63 battery notification layouts stay compact and centered across display widths, corner radii, and power states")
+    }
+}

@@ -14,10 +14,38 @@ protocol CalendarServiceProviding {
     func requestAccess(to type: EKEntityType) async throws -> Bool
     func calendars() async -> [CalendarModel]
     func events(from start: Date, to end: Date, calendars: [String]) async -> [EventModel]
+    func invalidateReminderCache()
+    func setReminderCompleted(reminderID: String, completed: Bool) async
 }
 
 class CalendarService: CalendarServiceProviding {
     private let store = EKEventStore()
+    private let reminderCacheLock = NSLock()
+    private var storeRevision = 0
+    private var reminderCache: (revision: Int, calendarIDs: Set<String>, events: [EventModel])?
+    private var reminderCacheExpiryTask: Task<Void, Never>?
+    private var reminderCacheExpiryID: UUID?
+    private struct ReminderCacheKey: Hashable {
+        let revision: Int
+        let calendarIDs: Set<String>
+    }
+    private var reminderFetches: [ReminderCacheKey: Task<[EventModel], Never>] = [:]
+    private enum ReminderRequest {
+        case cached([EventModel])
+        case fetch(Task<[EventModel], Never>)
+    }
+
+    func invalidateReminderCache() {
+        reminderCacheLock.lock()
+        storeRevision &+= 1
+        reminderCache = nil
+        reminderCacheExpiryTask?.cancel()
+        reminderCacheExpiryTask = nil
+        reminderCacheExpiryID = nil
+        reminderFetches.values.forEach { $0.cancel() }
+        reminderFetches.removeAll()
+        reminderCacheLock.unlock()
+    }
 
     @MainActor
     func requestAccess(to type: EKEntityType) async throws -> Bool {
@@ -75,34 +103,91 @@ class CalendarService: CalendarServiceProviding {
         // Fetch reminders
         if hasAccess(to: .reminder) {
             let reminderCalendars = ekCalendars.filter { store.calendars(for: .reminder).contains($0) }
-            events.append(contentsOf: await fetchReminders(from: start, to: end, calendars: reminderCalendars))
+            let reminderEvents = await reminderSnapshot(for: reminderCalendars)
+            events.append(contentsOf: reminderEvents.filter { $0.start >= start && $0.start < end })
         }
 
         return events.sorted { $0.start < $1.start }
     }
 
-    private func fetchReminders(from start: Date, to end: Date, calendars: [EKCalendar]) async -> [EventModel] {
+    private func reminderSnapshot(for calendars: [EKCalendar]) async -> [EventModel] {
+        switch reminderRequest(for: calendars) {
+        case .cached(let events):
+            return events
+        case .fetch(let task):
+            return await task.value
+        }
+    }
+
+    private func reminderRequest(for calendars: [EKCalendar]) -> ReminderRequest {
+        let calendarIDs = Set(calendars.map(\.calendarIdentifier))
+        reminderCacheLock.lock()
+        let revision = storeRevision
+        let cacheKey = ReminderCacheKey(revision: revision, calendarIDs: calendarIDs)
+        if let reminderCache,
+           reminderCache.revision == revision,
+           reminderCache.calendarIDs == calendarIDs {
+            scheduleReminderCacheExpiryLocked(for: cacheKey)
+            reminderCacheLock.unlock()
+            return .cached(reminderCache.events)
+        }
+        if let existingFetch = reminderFetches[cacheKey] {
+            reminderCacheLock.unlock()
+            return .fetch(existingFetch)
+        }
+        let fetch = Task { await self.fetchReminderEvents(in: calendars, revision: revision, key: cacheKey) }
+        reminderFetches[cacheKey] = fetch
+        reminderCacheLock.unlock()
+        return .fetch(fetch)
+    }
+
+    private func fetchReminderEvents(
+        in calendars: [EKCalendar],
+        revision: Int,
+        key: ReminderCacheKey
+    ) async -> [EventModel] {
         return await withCheckedContinuation { continuation in
-            // Create predicate for reminders with due dates in the specified range
             let predicate = store.predicateForReminders(in: calendars)
 
             store.fetchReminders(matching: predicate) { reminders in
-                let filteredReminders = (reminders ?? []).filter { reminder in
-                    guard let dueDate = reminder.displayedDueDate else {
-                        return false
-                    }
-
-                    return dueDate >= start && dueDate < end
+                let eventModels = (reminders ?? []).compactMap { EventModel(from: $0) }
+                self.reminderCacheLock.lock()
+                if self.storeRevision == revision {
+                    self.reminderCache = (revision, key.calendarIDs, eventModels)
+                    self.scheduleReminderCacheExpiryLocked(for: key)
                 }
-
-                // Convert to EventModel
-                let eventModels = filteredReminders.compactMap { reminder in
-                    EventModel(from: reminder)
-                }
-
+                self.reminderFetches.removeValue(forKey: key)
+                self.reminderCacheLock.unlock()
                 continuation.resume(returning: eventModels)
             }
         }
+    }
+
+    /// Retain reminder models for a short idle window; cache hits restart the timer.
+    private func scheduleReminderCacheExpiryLocked(for key: ReminderCacheKey) {
+        reminderCacheExpiryTask?.cancel()
+        let expiryID = UUID()
+        reminderCacheExpiryID = expiryID
+        reminderCacheExpiryTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(45))
+            guard !Task.isCancelled, let self else { return }
+            self.expireReminderCache(for: key, id: expiryID)
+        }
+    }
+
+    private func expireReminderCache(for key: ReminderCacheKey, id: UUID) {
+        reminderCacheLock.lock()
+        guard reminderCacheExpiryID == id else {
+            reminderCacheLock.unlock()
+            return
+        }
+        if storeRevision == key.revision,
+           reminderCache?.calendarIDs == key.calendarIDs {
+            reminderCache = nil
+        }
+        reminderCacheExpiryTask = nil
+        reminderCacheExpiryID = nil
+        reminderCacheLock.unlock()
     }
 
     func setReminderCompleted(reminderID: String, completed: Bool) async {

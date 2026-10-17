@@ -1,0 +1,315 @@
+import Combine
+import Foundation
+import SwiftUI
+
+struct NSAppleEventDescriptor {
+    enum Value {
+        case boolean(Bool)
+        case string(String)
+        case double(Double)
+        case integer(Int32)
+    }
+
+    private let values: [Value]
+    private let value: Value?
+
+    init(values: [Value]) { self.values = values; self.value = nil }
+    private init(value: Value) { self.values = []; self.value = value }
+    var numberOfItems: Int { values.count }
+    var booleanValue: Bool? { if case .boolean(let v) = value { v } else { nil } }
+    var stringValue: String? { if case .string(let v) = value { v } else { nil } }
+    var doubleValue: Double? {
+        switch value { case .double(let v): v; case .integer(let v): Double(v); default: nil }
+    }
+    var int32Value: Int32? { if case .integer(let v) = value { v } else { nil } }
+    func atIndex(_ index: Int) -> NSAppleEventDescriptor? {
+        guard values.indices.contains(index - 1) else { return nil }
+        return NSAppleEventDescriptor(value: values[index - 1])
+    }
+}
+
+struct TrackSnapshot {
+    var isPlaying = true
+    var title = "Track A"
+    var artist = "Artist"
+    var album = "Album"
+    var currentTime = 10.0
+    var durationMilliseconds = 180_000.0
+    var shuffled = false
+    var repeating = false
+    var volume: Int32 = 50
+    var artworkURL = "https://images.example/a"
+
+    var descriptor: NSAppleEventDescriptor {
+        NSAppleEventDescriptor(values: [
+            .boolean(isPlaying), .string(title), .string(artist), .string(album),
+            .double(currentTime), .double(durationMilliseconds), .boolean(shuffled),
+            .boolean(repeating), .integer(volume), .string(artworkURL)
+        ])
+    }
+}
+
+@MainActor
+final class NSWorkspace {
+    static let shared = NSWorkspace()
+    var active = false
+    var runningApplications: [FakeRunningApplication] {
+        active ? [FakeRunningApplication(bundleIdentifier: MediaAppBundleID.spotify)] : []
+    }
+}
+
+struct FakeRunningApplication { let bundleIdentifier: String }
+
+@MainActor
+enum AppleScriptHelper {
+    static var snapshot = TrackSnapshot()
+    static func execute(_ script: String) async throws -> NSAppleEventDescriptor? { snapshot.descriptor }
+}
+
+@MainActor
+enum AppleScriptControllerSupport {
+    static func playerInfoNotifications(named: String) -> AsyncStream<Void> { AsyncStream { _ in } }
+    static func executeCommand(_ command: String, appName: String) async {}
+}
+
+@MainActor
+final class ImageService {
+    static let shared = ImageService()
+    struct Pending {
+        let url: URL
+        let continuation: CheckedContinuation<Data, Error>
+        var finished = false
+    }
+    private(set) var requests: [URL] = []
+    private var pending: [Pending] = []
+
+    func reset() {
+        for index in pending.indices where !pending[index].finished {
+            pending[index].finished = true
+            pending[index].continuation.resume(throwing: CancellationError())
+        }
+        requests = []
+        pending = []
+    }
+
+    func fetchImageData(from url: URL) async throws -> Data {
+        requests.append(url)
+        return try await withCheckedThrowingContinuation { continuation in
+            pending.append(Pending(url: url, continuation: continuation))
+        }
+    }
+
+    func completeRequest(_ index: Int, with result: Result<Data, Error>) {
+        guard pending.indices.contains(index), !pending[index].finished else {
+            fatalError("No pending artwork request at index \(index)")
+        }
+        pending[index].finished = true
+        pending[index].continuation.resume(with: result)
+    }
+}
+
+struct PlaybackResponse: Sendable {
+    let isPaused: Bool
+    let title: String?
+    let artist: String?
+    let album: String?
+    let elapsedSeconds: Double?
+    let songDuration: Double?
+    let imageSrc: String?
+    let repeatMode: Int?
+    let isShuffled: Bool?
+    let volume: Double?
+
+    init(isPaused: Bool, title: String, artist: String = "Artist", elapsedSeconds: Double,
+         imageSrc: String, album: String? = "Album", songDuration: Double? = 180,
+         repeatMode: Int? = 0, isShuffled: Bool? = false, volume: Double? = 50) {
+        self.isPaused = isPaused
+        self.title = title
+        self.artist = artist
+        self.album = album
+        self.elapsedSeconds = elapsedSeconds
+        self.songDuration = songDuration
+        self.imageSrc = imageSrc
+        self.repeatMode = repeatMode
+        self.isShuffled = isShuffled
+        self.volume = volume
+    }
+}
+
+struct YouTubeMusicConfiguration {
+    let bundleIdentifier: String
+    static let `default` = YouTubeMusicConfiguration(bundleIdentifier: MediaAppBundleID.youTubeMusic)
+}
+
+@MainActor
+final class YouTubeArtworkHarness {
+    var playbackState = PlaybackState(bundleIdentifier: YouTubeMusicConfiguration.default.bundleIdentifier)
+    __YTM_PROPERTIES__
+    __YTM_METHOD__
+    __YTM_HELPER__
+    func apply(_ response: PlaybackResponse) async { await updatePlaybackState(with: response) }
+}
+
+@MainActor
+@main
+struct MediaArtworkHarness {
+    static func main() async throws {
+        try await checkSpotifyLiveStateMergeAndStaleIdentity()
+        try await checkSpotifyInactiveCancelsPendingArtwork()
+        try await checkSpotifyRetryBackoff()
+        try await checkYouTubeLiveStateMergeAndStaleIdentity()
+        try await checkYouTubeRetryBackoff()
+        ImageService.shared.reset()
+        try? await Task.sleep(for: .milliseconds(30))
+        print("PASS production artwork identity, live-state merge, URL deduplication and retry backoff")
+    }
+
+    private static func checkSpotifyLiveStateMergeAndStaleIdentity() async throws {
+        let imageService = ImageService.shared
+        imageService.reset()
+        NSWorkspace.shared.active = false
+        AppleScriptHelper.snapshot = TrackSnapshot()
+        let controller = SpotifyController()
+        var latest = PlaybackState(bundleIdentifier: MediaAppBundleID.spotify)
+        let subscription = controller.playbackStatePublisher.sink { latest = $0 }
+
+        NSWorkspace.shared.active = true
+        await controller.updatePlaybackInfo()
+        await waitUntil { imageService.requests.count == 1 }
+        try require(latest.title == "Track A" && latest.currentTime == 10 && latest.isPlaying,
+                    "Initial Spotify state should publish before artwork arrives")
+
+        AppleScriptHelper.snapshot.isPlaying = false
+        AppleScriptHelper.snapshot.currentTime = 44
+        await controller.updatePlaybackInfo()
+        await controller.updatePlaybackInfo()
+        try require(imageService.requests.count == 1, "Repeated Spotify polls for the same URL must share one fetch")
+        try require(!latest.isPlaying && latest.currentTime == 44, "Spotify pause and progress update should be current")
+
+        AppleScriptHelper.snapshot.title = "Track B"
+        AppleScriptHelper.snapshot.currentTime = 73
+        AppleScriptHelper.snapshot.artworkURL = "https://images.example/b"
+        await controller.updatePlaybackInfo()
+        await waitUntil { imageService.requests.count == 2 }
+        imageService.completeRequest(0, with: .success(Data("stale A".utf8)))
+        await Task.yield()
+        try require(latest.title == "Track B" && latest.currentTime == 73 && latest.artwork == nil,
+                    "Canceled Spotify completion must not overwrite the newer track")
+        imageService.completeRequest(1, with: .success(Data("art B".utf8)))
+        await waitUntil { latest.artwork == Data("art B".utf8) }
+        try require(latest.title == "Track B" && latest.currentTime == 73 && !latest.isPlaying,
+                    "Spotify artwork completion must merge into the latest paused state")
+        withExtendedLifetime(subscription) {}
+    }
+
+    private static func checkSpotifyRetryBackoff() async throws {
+        let imageService = ImageService.shared
+        imageService.reset()
+        NSWorkspace.shared.active = false
+        AppleScriptHelper.snapshot = TrackSnapshot()
+        let controller = SpotifyController()
+        NSWorkspace.shared.active = true
+        await controller.updatePlaybackInfo()
+        await waitUntil { imageService.requests.count == 1 }
+        imageService.completeRequest(0, with: .failure(URLError(.timedOut)))
+        try? await Task.sleep(for: .milliseconds(30))
+        await controller.updatePlaybackInfo()
+        try require(imageService.requests.count == 1, "Spotify should hold off same-URL retries during backoff")
+        await waitUntil(timeout: .seconds(8)) { imageService.requests.count == 2 }
+        try require(imageService.requests.count == 2, "Spotify should retry the failed artwork after backoff")
+    }
+
+    private static func checkSpotifyInactiveCancelsPendingArtwork() async throws {
+        let imageService = ImageService.shared
+        imageService.reset()
+        NSWorkspace.shared.active = false
+        AppleScriptHelper.snapshot = TrackSnapshot()
+        let controller = SpotifyController()
+        var latest = PlaybackState(bundleIdentifier: MediaAppBundleID.spotify)
+        let subscription = controller.playbackStatePublisher.sink { latest = $0 }
+        NSWorkspace.shared.active = true
+        await controller.updatePlaybackInfo()
+        await waitUntil { imageService.requests.count == 1 }
+
+        NSWorkspace.shared.active = false
+        await controller.updatePlaybackInfo()
+        imageService.completeRequest(0, with: .success(Data("late artwork".utf8)))
+        try? await Task.sleep(for: .milliseconds(30))
+        try require(latest.artwork == nil, "Inactive Spotify response must invalidate a delayed artwork completion")
+        withExtendedLifetime(subscription) {}
+    }
+
+    private static func checkYouTubeLiveStateMergeAndStaleIdentity() async throws {
+        let imageService = ImageService.shared
+        imageService.reset()
+        let harness = YouTubeArtworkHarness()
+        await harness.apply(PlaybackResponse(isPaused: false, title: "No artwork", elapsedSeconds: 0,
+            imageSrc: ""))
+        try await Task.sleep(for: .milliseconds(30))
+        try require(imageService.requests.isEmpty, "An empty artwork URL must not start a fetch or retry loop")
+        await harness.apply(PlaybackResponse(isPaused: false, title: "Track A", elapsedSeconds: 10,
+            imageSrc: "https://images.example/a"))
+        await waitUntil { imageService.requests.count == 1 }
+        await harness.apply(PlaybackResponse(isPaused: true, title: "Track A", elapsedSeconds: 45,
+            imageSrc: "https://images.example/a"))
+        try require(imageService.requests.count == 1, "Unchanged YouTube Music artwork URL must not refetch while pending")
+        try require(harness.playbackState.currentTime == 45 && !harness.playbackState.isPlaying,
+                    "YouTube Music pause and progress update should be current")
+
+        await harness.apply(PlaybackResponse(isPaused: true, title: "Track B", elapsedSeconds: 70,
+            imageSrc: "https://images.example/b"))
+        await waitUntil { imageService.requests.count == 2 }
+        await harness.apply(PlaybackResponse(isPaused: true, title: "Track C", elapsedSeconds: 88,
+            imageSrc: "https://images.example/c"))
+        await waitUntil { imageService.requests.count == 3 }
+        imageService.completeRequest(1, with: .success(Data("stale B".utf8)))
+        await Task.yield()
+        try require(harness.playbackState.title == "Track C" && harness.playbackState.artwork == nil,
+                    "Canceled YouTube Music completion must not overwrite the newer track")
+        imageService.completeRequest(2, with: .success(Data("art C".utf8)))
+        await waitUntil { harness.playbackState.artwork == Data("art C".utf8) }
+        await harness.apply(PlaybackResponse(isPaused: true, title: "Track C", elapsedSeconds: 88,
+            imageSrc: "https://images.example/c"))
+        try require(imageService.requests.count == 3, "YouTube Music must retain artwork for an unchanged URL after completion")
+        try require(harness.playbackState.title == "Track C" && harness.playbackState.currentTime == 88,
+                    "YouTube Music artwork completion must merge into current playback state")
+    }
+
+    private static func checkYouTubeRetryBackoff() async throws {
+        let imageService = ImageService.shared
+        imageService.reset()
+        let harness = YouTubeArtworkHarness()
+        let response = PlaybackResponse(isPaused: false, title: "Retry", elapsedSeconds: 1,
+            imageSrc: "https://images.example/retry")
+        await harness.apply(response)
+        await waitUntil { imageService.requests.count == 1 }
+        imageService.completeRequest(0, with: .failure(URLError(.timedOut)))
+        try? await Task.sleep(for: .milliseconds(30))
+        try require(imageService.requests.count == 1, "YouTube Music should hold off same-URL retries during backoff")
+        try await Task.sleep(for: .seconds(5.1))
+        await waitUntil { imageService.requests.count == 2 }
+        imageService.completeRequest(1, with: .success(Data("retried art".utf8)))
+        await waitUntil { harness.playbackState.artwork == Data("retried art".utf8) }
+        try require(harness.playbackState.title == "Retry" && harness.playbackState.currentTime == 1,
+                    "YouTube Music must retry without another response and preserve metadata")
+    }
+
+    private static func waitUntil(timeout: Duration = .seconds(2), _ predicate: @MainActor () -> Bool) async {
+        let deadline = ContinuousClock.now + timeout
+        while !predicate() && ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        if !predicate() { fatalError("Timed out waiting for asynchronous artwork event") }
+    }
+
+    private static func require(_ condition: Bool, _ message: String) throws {
+        if !condition { throw HarnessFailure.assertion(message) }
+    }
+}
+
+enum HarnessFailure: Error, CustomStringConvertible {
+    case assertion(String)
+    var description: String {
+        switch self { case .assertion(let message): return message }
+    }
+}

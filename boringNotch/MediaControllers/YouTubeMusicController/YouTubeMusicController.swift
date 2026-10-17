@@ -18,6 +18,10 @@ final class YouTubeMusicController: MediaControllerProtocol {
     )
 
     private var artworkFetchTask: Task<Void, Never>?
+    private var artworkRetryTask: Task<Void, Never>?
+    private var artworkURL: String?
+    private var artworkRequestID: UUID?
+    private var artworkRetryNotBefore: Date?
 
     var playbackStatePublisher: AnyPublisher<PlaybackState, Never> {
         $playbackState.eraseToAnyPublisher()
@@ -70,6 +74,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
 
     deinit {
         artworkFetchTask?.cancel()
+        artworkRetryTask?.cancel()
         reconnectTask?.cancel()
         appStateObserver?.cancel()
         updateTimer?.invalidate()
@@ -461,6 +466,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
 
     private func updatePlaybackState(with response: PlaybackResponse) async {
         var newState = playbackState
+        var pendingArtworkFetch: (imageURL: String, url: URL, requestID: UUID)?
 
         newState.isPlaying = !response.isPaused
 
@@ -503,27 +509,94 @@ final class YouTubeMusicController: MediaControllerProtocol {
             newState.volume = volume / 100.0
         }
 
-        if newState != playbackState {
-            playbackState = newState
+        if let imageURL = response.imageSrc, !imageURL.isEmpty {
+            let url = URL(string: imageURL)
+            var artworkURLChanged = false
+            if imageURL != artworkURL {
+                artworkFetchTask?.cancel()
+                artworkFetchTask = nil
+                artworkRetryTask?.cancel()
+                artworkRetryTask = nil
+                artworkRequestID = nil
+                artworkURL = imageURL
+                artworkRetryNotBefore = nil
+                newState.artwork = nil
+                artworkURLChanged = true
+            }
 
+            if let url, artworkURLChanged ||
+                (newState.artwork == nil && artworkRequestID == nil &&
+                 (artworkRetryNotBefore.map { Date() >= $0 } ?? true)) {
+                pendingArtworkFetch = (imageURL, url, UUID())
+            }
+        } else if newState.title != playbackState.title || newState.artist != playbackState.artist {
             artworkFetchTask?.cancel()
             artworkFetchTask = nil
+            artworkRetryTask?.cancel()
+            artworkRetryTask = nil
+            artworkRequestID = nil
+            artworkURL = nil
+            artworkRetryNotBefore = nil
+            newState.artwork = nil
+        }
 
-            if let artworkURL = response.imageSrc,
-               let url = URL(string: artworkURL) {
-                artworkFetchTask = Task {
-                    do {
-                        let data = try await ImageService.shared.fetchImageData(from: url)
-                        await MainActor.run { [weak self] in
-                            self?.playbackState.artwork = data
-                        }
-                    } catch { /* ignore */ }
+        if newState != playbackState {
+            playbackState = newState
+        }
+
+        if let pendingArtworkFetch {
+            startArtworkFetch(imageURL: pendingArtworkFetch.imageURL,
+                              url: pendingArtworkFetch.url,
+                              requestID: pendingArtworkFetch.requestID)
+        }
+    }
+
+    private func startArtworkFetch(imageURL: String, url: URL, requestID: UUID) {
+        artworkRetryTask?.cancel()
+        artworkRetryTask = nil
+        artworkRetryNotBefore = nil
+        artworkRequestID = requestID
+        artworkFetchTask = Task { [weak self] in
+            do {
+                let data = try await ImageService.shared.fetchImageData(from: url)
+                guard let self else { return }
+                guard !Task.isCancelled,
+                      self.artworkRequestID == requestID,
+                      self.artworkURL == imageURL else { return }
+                var updatedState = self.playbackState
+                updatedState.artwork = data
+                self.playbackState = updatedState
+                self.artworkFetchTask = nil
+                self.artworkRequestID = nil
+                self.artworkRetryNotBefore = nil
+            } catch {
+                guard let self, self.artworkRequestID == requestID else { return }
+                self.artworkFetchTask = nil
+                self.artworkRequestID = nil
+                let retryAt = Date().addingTimeInterval(5)
+                self.artworkRetryNotBefore = retryAt
+                self.artworkRetryTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(5))
+                    guard let self,
+                          !Task.isCancelled,
+                          self.artworkURL == imageURL,
+                          self.artworkRequestID == nil,
+                          self.playbackState.artwork == nil,
+                          self.artworkRetryNotBefore.map({ Date() >= $0 }) == true else { return }
+                    self.startArtworkFetch(imageURL: imageURL, url: url, requestID: UUID())
                 }
             }
         }
     }
 
     private func resetPlaybackState() {
+        artworkFetchTask?.cancel()
+        artworkFetchTask = nil
+        artworkRetryTask?.cancel()
+        artworkRetryTask = nil
+        artworkRequestID = nil
+        artworkURL = nil
+        artworkRetryNotBefore = nil
         playbackState = PlaybackState(
             bundleIdentifier: configuration.bundleIdentifier,
             isPlaying: false,

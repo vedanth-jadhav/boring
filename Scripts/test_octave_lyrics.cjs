@@ -6,18 +6,29 @@ const vm = require('node:vm');
 let sampleTime = 25.125;
 const heartbeats = [];
 const audioListeners = new Map();
-const window = {addEventListener() {}, postMessage() {}};
-const context = vm.createContext({window, navigator: {mediaSession: {setActionHandler() {}}},
+const fetchCalls = [];
+const ownLyricsMessages = [];
+const samples = [];
+const baseFetch = async (url, options) => {
+  fetchCalls.push({url, options});
+  const body = {success: true, synced: false, lyrics: 'A plain lyric'};
+  return {json: async () => body, clone() { return {json: async () => body}; }};
+};
+const window = {addEventListener() {}, postMessage() {}, fetch: baseFetch};
+const sandbox = {window, navigator: {mediaSession: {setActionHandler() {}}},
   MediaSession: class {}, location: {origin: 'https://music.octavestreaming.com'},
-  queueMicrotask, setInterval(fn) {heartbeats.push(fn);}, AbortController, performance: {timeOrigin: 1000000, now: () => sampleTime}, fetch: async () => ({}), console});
+  queueMicrotask, setInterval(fn) {heartbeats.push(fn);}, AbortController, performance: {timeOrigin: 1000000, now: () => sampleTime}, console};
+Object.defineProperty(sandbox, 'fetch', {
+  get: () => window.fetch,
+  set: value => { window.fetch = value; }
+});
+const context = vm.createContext(sandbox);
 const source = fs.readFileSync('octave-brave-extension/page.js', 'utf8');
 vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.parseLyrics = parseLyrics;globalThis.requestLyrics = requestLyrics;})();'), context);
-const lyricRequests = [];
-context.fetch = async (url, options) => {
-  lyricRequests.push({url, options});
-  return {json: async () => ({success: false})};
+window.postMessage = message => {
+  ownLyricsMessages.push(message);
+  samples.push(message);
 };
-context.requestLyrics({id: 'fixture', title: 'Banda Kaam Ka', artist: {name: 'Chaar Diwaari'}});
 const parse = body => JSON.parse(JSON.stringify(context.parseLyrics(body)));
 assert.deepEqual(parse({richSync: [{start: 10, end: 12, text: 'ਤੇਰਾ ਪਿਆਰ',
   words: [{start: 10.2, end: 10.7, word: 'ਤੇਰਾ'}, {start: 11, end: 11.6, word: 'ਪਿਆਰ'}]}]}),
@@ -38,9 +49,26 @@ assert.deepEqual(parse({richSync: [
 ]}).map(line => [line.time, line.words[0].start, line.isBackground || false]),
   [[1.125, 1.125, false], [1.125, 1.175, true]]);
 
+// The bridge's own request must bypass its window.fetch interceptor. An
+// Octave-owned lyrics request must still pass through it and publish once.
+async function verifyLyricsFetchRouting() {
+  const publishedLyrics = () => ownLyricsMessages.filter(message => message.type === 'lyrics');
+  await context.requestLyrics({id: 'fixture', title: 'Banda Kaam Ka', artist: {name: 'Chaar Diwaari'}});
+  assert.equal(fetchCalls.length, 1, 'Own request reaches the underlying fetch exactly once');
+  assert.equal(fetchCalls[0].url, 'https://api.octavestreaming.com/api/lyrics');
+  assert.equal(JSON.parse(fetchCalls[0].options.body).title, 'Banda Kaam Ka');
+  assert.equal(publishedLyrics().length, 1, 'Own request publishes a single response');
+  assert.equal(publishedLyrics()[0].plainLyrics, 'A plain lyric');
+
+  await context.fetch('https://api.octavestreaming.com/api/lyrics', {method: 'POST',
+    body: JSON.stringify({title: 'Octave lyrics', artist: 'Artist'})});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fetchCalls.length, 2, 'External request reaches underlying fetch once');
+  assert.equal(publishedLyrics().length, 2, 'External request is intercepted and published once');
+  assert.equal(publishedLyrics()[1].title, 'Octave lyrics');
+}
+
 // The sample timestamp is captured with audio.currentTime, before transport.
-const samples = [];
-window.postMessage = message => samples.push(message);
 context.navigator.mediaSession.metadata = {title: 'Timing fixture', artist: 'Artist'};
 window.__octaveEngine = {active: {currentTime: 10.125, duration: 100, paused: false,
   playbackRate: 1, volume: 1, readyState: 4, addEventListener(name, fn) {audioListeners.set(name, fn);}, removeEventListener(name) {audioListeners.delete(name);}}};
@@ -67,8 +95,7 @@ messages.length = 0;
 disconnect(); reconnect();
 assert.deepEqual(messages.map(m => m.type), ['state']);
 setImmediate(() => {
-  assert.equal(lyricRequests[0].url, 'https://api.octavestreaming.com/api/lyrics');
-  assert.equal(JSON.parse(lyricRequests[0].options.body).title, 'Banda Kaam Ka');
+  verifyLyricsFetchRouting().then(() => {
   const sample = samples.find(message => message.type === 'state');
   assert.equal(sample.sampledAt, 1000025.125);
   assert.equal(sample.position, 10.125);
@@ -106,5 +133,6 @@ setImmediate(() => {
   const previousCount = samples.length;
   heartbeats[0]();
   assert.equal(samples.length, previousCount + 1, 'Heartbeat works without timeupdate');
-  console.log('Octave parser, overlapping vocals, precise clock and reconnect tests passed');
+  console.log('Octave parser, fetch routing, overlapping vocals, precise clock and reconnect tests passed');
+  }).catch(error => { console.error(error); process.exitCode = 1; });
 });

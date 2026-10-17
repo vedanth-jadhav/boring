@@ -36,6 +36,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release already published; preserving its existing DMG and checksum."
+            exit 0
+          fi
           gh release create "$GITHUB_REF_NAME" \
             "build/releases/Boring-Notch-Octave-${GITHUB_REF_NAME#v}-macOS.dmg" \
             "build/releases/Boring-Notch-Octave-${GITHUB_REF_NAME#v}-macOS.dmg.sha256" \

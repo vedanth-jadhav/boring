@@ -3,6 +3,7 @@
 (() => {
   if (window.__boringNotchOctaveBridge) return;
   window.__boringNotchOctaveBridge = true;
+  const originalFetch = window.fetch.bind(window);
   const handlers = new Map();
   let deck = null;
   let buffering = false;
@@ -68,7 +69,7 @@
     const title = track.title || "";
     const artist = track.artist?.name || "";
     try {
-      const response = await fetch("https://api.octavestreaming.com/api/lyrics", {method: "POST", headers: {"Content-Type": "application/json"},
+      const response = await originalFetch("https://api.octavestreaming.com/api/lyrics", {method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify({id: track.id, title, artist, album: track.album?.title || "",
           duration: track.duration || 0}), signal: request.signal});
       const body = await response.json();
@@ -178,9 +179,8 @@
   });
 
   // Capture lyrics supplied by Octave itself when its lyrics view requests them.
-  const originalFetch = window.fetch;
   window.fetch = function(...args) {
-    const result = originalFetch.apply(this, args);
+    const result = originalFetch(...args);
     const url = String(args[0]?.url || args[0]);
     if (url.includes("/lyrics") && args[1]?.method === "POST") {
       result.then(async response => {

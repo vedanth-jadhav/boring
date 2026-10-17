@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 @main struct CodexUsageChecks {
     static func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
@@ -21,7 +22,10 @@ import Foundation
     static func main() async throws {
         let fm = FileManager.default
         let home = fm.temporaryDirectory.appendingPathComponent("codex-checks-\(UUID().uuidString)")
-        defer { try? fm.removeItem(at: home) }
+        let digest = SHA256.hash(data: Data(home.path.utf8)).map { String(format: "%02x", $0) }.joined()
+        let cacheFile = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("local.vedanth.boringnotch.octave/Codex/usage-\(digest).json")
+        defer { try? fm.removeItem(at: home); try? fm.removeItem(at: cacheFile) }
         try fm.createDirectory(at: home.appendingPathComponent("sessions"), withIntermediateDirectories: true)
         let now = Date()
         let claude = AIUsageParser.claude(["five_hour": ["utilization": 25.0, "resets_at": now.addingTimeInterval(60).ISO8601Format()],
@@ -89,6 +93,13 @@ import Foundation
         expect(sol.total == 1_100, "Attribute each delta to its turn model")
         let unchanged = try await scanner.scan(home: home, now: now)
         expect(total(unchanged) == total(initial), "Unchanged cache scan must be idempotent")
+        let savedAttributes = try fm.attributesOfItem(atPath: cacheFile.path)
+        for _ in 0..<5 { _ = try await scanner.scan(home: home, now: now) }
+        _ = try await CodexLogScanner().scan(home: home, now: now)
+        let warmAttributes = try fm.attributesOfItem(atPath: cacheFile.path)
+        expect(savedAttributes[.systemFileNumber] as? NSNumber == warmAttributes[.systemFileNumber] as? NSNumber
+               && savedAttributes[.modificationDate] as? Date == warmAttributes[.modificationDate] as? Date,
+               "Unchanged scans, including a reloaded scanner, must not rewrite the persistent cache")
 
         let next = try tokens(2_000, 900, 220, date: now.addingTimeInterval(5))
         let handle = try FileHandle(forWritingTo: file); try handle.seekToEnd()
@@ -118,6 +129,24 @@ import Foundation
         try Data("malformed row\n".utf8).write(to: file)
         let truncated = try await scanner.scan(home: home, now: now)
         expect(total(truncated).total == 2_550, "Copied archive still preserves original usage after truncation")
+        let afterRetention = Calendar.current.date(byAdding: .day, value: 31, to: now)!
+        let expired = try await scanner.scan(home: home, now: afterRetention)
+        expect(expired.fileCount == 0 && total(expired).total == 0, "A changed 30-day cutoff must invalidate the warm report and prune expired files")
+        let restored = try await scanner.scan(home: home, now: now)
+        expect(total(restored).total == 2_550, "A changed cutoff must rebuild the correct report")
+        try fm.removeItem(at: fork)
+        let removed = try await scanner.scan(home: home, now: now)
+        expect(total(removed).total == 2_220, "Removing a file must invalidate the warm report")
+        let boundaryFile = home.appendingPathComponent("sessions/boundary.jsonl")
+        let boundaryDate = CodexUsagePeriod.month.start(at: now).addingTimeInterval(60)
+        try tokens(10, 0, 1, date: boundaryDate).write(to: boundaryFile)
+        let atBoundary = try await scanner.scan(home: home, now: now)
+        expect(total(atBoundary).total == 2_231, "Include usage on the oldest retained day")
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: now)!
+        let shifted = try await scanner.scan(home: home, now: tomorrow)
+        expect(total(shifted).total == 2_220, "A new day must prune expired totals in otherwise unchanged files")
+        let shiftedReloaded = try await CodexLogScanner().scan(home: home, now: tomorrow)
+        expect(total(shiftedReloaded).total == 2_220, "Daily pruning must persist without rereading unchanged files")
 
         let html = "<table><tr><th>Model</th><th>Input</th><th>Cached input</th><th>Cache writes</th><th>Output</th></tr><tr><td>gpt-6.1-sol</td><td>$2.00</td><td>$0.10</td><td>$2.50</td><td>$10.00</td></tr><tr><td>gpt-6-astra</td><td>$10</td><td>$1</td><td>$12.50</td><td>$50</td></tr><tr><td>gpt-6-luna</td><td>$0.10</td><td>$0.01</td><td>$0.125</td><td>$0.50</td></tr></table>"
         let rates = try CodexRateCatalog.parse(html: html)

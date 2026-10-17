@@ -12,15 +12,19 @@ final class NotchTerminalManager: ObservableObject {
     @Published var error: String?
     let tmuxPath = TerminalSessionBackend.tmuxPath
     private let backend: TerminalSessionBackend
+    private let metadataPollInterval: Duration
     private var monitor: Task<Void, Never>?
+    private var refresh: Task<Void, Never>?
     private var generation = 0
+    private var metadataConsumers: Set<UUID> = []
 
     var attachCommand: String? {
         tmuxPath.map { TerminalSessionSupport.attachCommand(tmux: $0) }
     }
 
-    init(backend: TerminalSessionBackend = TerminalSessionBackend()) {
+    init(backend: TerminalSessionBackend = TerminalSessionBackend(), metadataPollInterval: Duration = .seconds(5)) {
         self.backend = backend
+        self.metadataPollInterval = metadataPollInterval
         setEnabled(Defaults[.terminalEnabled])
     }
 
@@ -28,36 +32,66 @@ final class NotchTerminalManager: ObservableObject {
         generation += 1
         monitor?.cancel()
         monitor = nil
+        refresh?.cancel()
+        refresh = nil
         if enabled {
-            monitorSession()
+            if metadataConsumers.isEmpty {
+                refreshSession()
+            } else {
+                monitorSession()
+            }
         } else {
             ports = []
             isStarting = false
         }
     }
 
-    func start(force: Bool = false) async {
+    func acquireMetadataDemand(_ id: UUID) {
+        guard Defaults[.terminalEnabled], metadataConsumers.insert(id).inserted else { return }
+        refresh?.cancel()
+        refresh = nil
+        monitorSession()
+    }
+
+    func releaseMetadataDemand(_ id: UUID) {
+        guard metadataConsumers.remove(id) != nil, metadataConsumers.isEmpty else { return }
+        generation += 1
+        monitor?.cancel()
+        monitor = nil
+        refresh?.cancel()
+        refresh = nil
+        isStarting = false
+    }
+
+    func start(force _: Bool = false) async {
         guard Defaults[.terminalEnabled], !isStarting else { return }
-        if isRunning && !force { return }
-        isStarting = true
-        error = nil
+        generation += 1
         let token = generation
-        defer { isStarting = false }
+        monitor?.cancel()
+        monitor = nil
+        refresh?.cancel()
+        refresh = nil
+        isStarting = true
+        isRunning = false
+        error = nil
+        defer {
+            if token == generation {
+                isStarting = false
+                if !metadataConsumers.isEmpty { monitorSession() }
+            }
+        }
         do {
             try await backend.start()
             guard token == generation, Defaults[.terminalEnabled] else { return }
             // Show the shell immediately; socket/process inspection is background metadata.
             isRunning = true
-            monitor?.cancel()
-            monitor = nil
-            monitorSession()
         } catch {
             if token == generation { self.error = error.localizedDescription }
         }
     }
 
     private func monitorSession() {
-        guard monitor == nil else { return }
+        guard monitor == nil, !isStarting, Defaults[.terminalEnabled], !metadataConsumers.isEmpty else { return }
         let token = generation
         monitor = Task { [weak self] in
             while !Task.isCancelled {
@@ -66,15 +100,28 @@ final class NotchTerminalManager: ObservableObject {
                     let snapshot = try await self.backend.snapshot()
                     guard !Task.isCancelled, token == self.generation else { return }
                     self.apply(snapshot)
-                    if !snapshot.exists {
-                        self.monitor = nil
-                        return
-                    }
                 } catch {
                     guard !Task.isCancelled, token == self.generation else { return }
                     self.error = error.localizedDescription
                 }
-                try? await Task.sleep(for: .seconds(5))
+                try? await Task.sleep(for: metadataPollInterval)
+            }
+        }
+    }
+
+    private func refreshSession() {
+        refresh?.cancel()
+        let token = generation
+        refresh = Task { [weak self] in
+            defer { if self?.generation == token { self?.refresh = nil } }
+            guard let self else { return }
+            do {
+                let snapshot = try await backend.snapshot()
+                guard !Task.isCancelled, token == generation, Defaults[.terminalEnabled], metadataConsumers.isEmpty else { return }
+                apply(snapshot)
+            } catch {
+                guard !Task.isCancelled, token == generation, Defaults[.terminalEnabled] else { return }
+                self.error = error.localizedDescription
             }
         }
     }

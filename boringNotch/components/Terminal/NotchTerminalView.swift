@@ -9,6 +9,7 @@ struct NotchTerminalView: View {
     @ViewState private var attachmentID = UUID()
     @ViewState private var copied = false
     @ViewState private var opening = false
+    @ViewState private var demandID = UUID()
 
     private var application: TerminalApplication { .preferred(preferredApplication) }
 
@@ -98,6 +99,8 @@ struct NotchTerminalView: View {
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 6)
+        .onAppear { terminal.acquireMetadataDemand(demandID) }
+        .onDisappear { terminal.releaseMetadataDemand(demandID) }
         .task { await terminal.start() }
     }
 

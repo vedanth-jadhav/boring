@@ -37,12 +37,19 @@ func checkVisibleCaptureConsumers() {
         styleMask: [], backing: .buffered, defer: true)
     let first = MusicVisualizerModel(frame: CGRect(x: 0, y: 0, width: 20, height: 14))
     let second = MusicVisualizerModel(frame: CGRect(x: 30, y: 0, width: 20, height: 14))
+    first.setCaptureDemand(true)
+    second.setCaptureDemand(true)
+    first.setPlaying(true)
+    second.setPlaying(true)
     first.attach(to: manager)
     second.attach(to: manager)
     precondition(manager.consumers.isEmpty, "Detached views must not request capture")
     window.contentView?.addSubview(first)
     window.contentView?.addSubview(second)
-    precondition(manager.consumers.count == 2)
+    precondition(manager.consumers.count == 2,
+                 "Realtime demand must register before capture reports itself active")
+    first.setUseRealtime(true)
+    second.setUseRealtime(true)
     first.isHidden = true
     precondition(manager.consumers.count == 1, "One hidden view must retain the other consumer")
     second.removeFromSuperview()
@@ -57,5 +64,31 @@ func checkVisibleCaptureConsumers() {
     precondition(manager.consumers.count == 1)
     first.detach()
     precondition(manager.consumers.isEmpty, "Dismantling must release the final consumer")
-    print("PASS capture consumers attach/hide/occlude/restore/dismantle")
+
+    let decorative = MusicVisualizerModel(frame: CGRect(x: 0, y: 0, width: 20, height: 14))
+    decorative.attach(to: manager)
+    decorative.setReduceMotion(true)
+    window.contentView?.addSubview(decorative)
+    decorative.setPlaying(true)
+    precondition(manager.consumers.isEmpty, "Idle animation must not request audio capture")
+    precondition(decorative.layer?.sublayers?.allSatisfy {
+        $0.animation(forKey: "scaleAnimation") == nil
+    } == true, "Reduce Motion must suppress random bar animations")
+    decorative.setReduceMotion(false)
+    precondition(decorative.layer?.sublayers?.contains {
+        $0.animation(forKey: "scaleAnimation") != nil
+    } == true, "Random animation should resume when Reduce Motion is off")
+    decorative.setCaptureDemand(true)
+    precondition(manager.consumers.count == 1, "Realtime preference must request capture before rendering switches modes")
+    decorative.setUseRealtime(true)
+    precondition(manager.consumers.count == 1, "Realtime waveform should retain its capture consumer")
+    decorative.setReduceMotion(true)
+    precondition(manager.consumers.count == 1, "Reduce Motion must preserve the selected realtime waveform")
+    precondition(decorative.layer?.sublayers?.allSatisfy {
+        $0.animation(forKey: "scaleAnimation") == nil
+    } == true)
+    decorative.setPlaying(false)
+    precondition(manager.consumers.isEmpty, "Stopped waveform must release capture demand")
+    decorative.detach()
+    print("PASS visible capture consumers and Reduce Motion animation/capture behavior")
 }

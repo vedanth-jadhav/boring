@@ -24,14 +24,18 @@ final class CalendarManager: ObservableObject {
     @Published var calendarAuthorizationStatus: EKAuthorizationStatus = .notDetermined
     @Published var reminderAuthorizationStatus: EKAuthorizationStatus = .notDetermined
     private var selectedCalendars: [CalendarModel] = []
-    private let calendarService = CalendarService()
+    private let calendarService: CalendarServiceProviding
 
     private var eventStoreChangedObserver: NSObjectProtocol?
     /// EventKit can fire EKEventStoreChanged in bursts during syncs; reloads
     /// coalesce so the UI refreshes once per burst instead of per notification.
     private var reloadTask: Task<Void, Never>?
+    private var storeChangePending = false
+    private var eventRequestTask: Task<Void, Never>?
+    private var eventRequestGeneration: UInt64 = 0
 
-    private init() {
+    init(calendarService: CalendarServiceProviding = CalendarService()) {
+        self.calendarService = calendarService
         self.currentWeekStartDate = CalendarManager.startOfDay(Date())
         setupEventStoreChangedObserver()
         Task {
@@ -51,12 +55,31 @@ final class CalendarManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            guard let self, self.reloadTask == nil else { return }
-            self.reloadTask = Task { @MainActor in
-                defer { self.reloadTask = nil }
-                try? await Task.sleep(for: .seconds(2))
-                guard !Task.isCancelled else { return }
-                await self.reloadCalendarAndReminderLists()
+            guard let self else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.calendarService.invalidateReminderCache()
+                self.cancelPendingEventRequest()
+                self.storeChangePending = true
+                guard self.reloadTask == nil else { return }
+                self.reloadTask = Task { @MainActor in
+                    defer { self.reloadTask = nil }
+                    try? await Task.sleep(for: .seconds(2))
+                    guard !Task.isCancelled else { return }
+                    while self.storeChangePending && !Task.isCancelled {
+                        self.storeChangePending = false
+                        await self.reloadCalendarAndReminderLists()
+                        guard !Task.isCancelled else { return }
+                        if self.storeChangePending {
+                            try? await Task.sleep(for: .milliseconds(100))
+                            continue
+                        }
+                        await self.updateEvents()
+                        if self.storeChangePending {
+                            try? await Task.sleep(for: .milliseconds(100))
+                        }
+                    }
+                }
             }
         }
     }
@@ -86,20 +109,14 @@ final class CalendarManager: ObservableObject {
             self.calendarAuthorizationStatus = granted ? .fullAccess : .denied
             if granted {
                 await reloadCalendarAndReminderLists()
-                events = await calendarService.events(
-                    from: currentWeekStartDate,
-                    to: Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate)!,
-                    calendars: selectedCalendars.map { $0.id })
+                await updateEvents()
             }
         case .restricted, .denied:
             NSLog("Calendar access denied or restricted")
         case .fullAccess:
             NSLog("Full access")
             await reloadCalendarAndReminderLists()
-            events = await calendarService.events(
-                from: currentWeekStartDate,
-                to: Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate)!,
-                calendars: selectedCalendars.map { $0.id })
+            await updateEvents()
         case .writeOnly:
             NSLog("Write only")
         @unknown default:
@@ -123,12 +140,14 @@ final class CalendarManager: ObservableObject {
             self.reminderAuthorizationStatus = granted ? .fullAccess : .denied
             if granted {
                 await reloadCalendarAndReminderLists()
+                await updateEvents()
             }
         case .restricted, .denied:
             NSLog("Reminder access denied or restricted")
         case .fullAccess:
             NSLog("Full access")
             await reloadCalendarAndReminderLists()
+            await updateEvents()
         case .writeOnly:
             NSLog("Write only")
         @unknown default:
@@ -190,21 +209,37 @@ final class CalendarManager: ObservableObject {
     }
 
     private func updateEvents() async {
+        eventRequestGeneration &+= 1
+        let generation = eventRequestGeneration
+        eventRequestTask?.cancel()
+
+        let service = calendarService
+        let selectedDate = currentWeekStartDate
         let calendarIDs = selectedCalendars.map { $0.id }
-        let eventsResult = await calendarService.events(
-            from: currentWeekStartDate,
-            to: Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate)!,
-            calendars: calendarIDs
-        )
-        self.events = eventsResult
+        let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+        let request = Task { @MainActor [weak self] in
+            // Date-strip gestures can generate many changes in a single frame.
+            try? await Task.sleep(for: .milliseconds(30))
+            guard !Task.isCancelled else { return }
+            let result = await service.events(from: selectedDate, to: nextDay, calendars: calendarIDs)
+            guard !Task.isCancelled,
+                  let self,
+                  self.eventRequestGeneration == generation else { return }
+            self.events = result
+        }
+        eventRequestTask = request
+        await request.value
+    }
+
+    private func cancelPendingEventRequest() {
+        eventRequestGeneration &+= 1
+        eventRequestTask?.cancel()
+        eventRequestTask = nil
     }
 
     func setReminderCompleted(reminderID: String, completed: Bool) async {
         await calendarService.setReminderCompleted(reminderID: reminderID, completed: completed)
-        // Refresh events after updating
-        events = await calendarService.events(
-            from: currentWeekStartDate,
-            to: Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate)!,
-            calendars: selectedCalendars.map { $0.id })
+        calendarService.invalidateReminderCache()
+        await updateEvents()
     }
 }

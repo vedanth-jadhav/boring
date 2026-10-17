@@ -35,6 +35,7 @@ performance_objects=("$performance_binary_dir/Defaults.build/"*.o)
   boringNotch/models/LyricsRomanizer.swift boringNotch/models/RomanizationLexicon.swift boringNotch/managers/LyricsService.swift \
   boringNotch/models/{LyricAttribution,SpicyLyricsPayload}.swift boringNotch/managers/SpicyLyricsClient.swift \
   boringNotch/helpers/LegacyKeychainAccess.swift boringNotch/helpers/SpicyLyricsCredential.swift \
+  boringNotch/helpers/LyricsKeychainClient.swift Shared/LyricsKeychainProtocol.swift \
   boringNotch/managers/EnhancedLyricsSettingsModel.swift \
   boringNotch/MediaControllers/MediaAppBundleID.swift boringNotch/helpers/AppleScriptHelper.swift \
   boringNotch/components/LiveActivities/LyricTextLayout.swift boringNotch/extensions/NSImage+Extensions.swift \

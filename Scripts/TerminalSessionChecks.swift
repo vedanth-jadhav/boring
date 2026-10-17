@@ -15,6 +15,38 @@ import Foundation
         return String(decoding: data, as: UTF8.self)
     }
 
+    static func slowBackend(in directory: URL, label: String,
+                            parentExitsOnTERM: Bool = false) throws -> (TerminalSessionBackend, URL) {
+        let childPIDFile = directory.appendingPathComponent("\(label)-child.pid")
+        let script = directory.appendingPathComponent("\(label)-tmux")
+        let child = "/bin/sh -c 'trap \"\" TERM; exec /bin/sleep 20' &\n"
+        let body = "#!/bin/sh\n" + (parentExitsOnTERM ? child : "trap '' TERM\n/bin/sleep 20 &\n") +
+            "echo $! > " + TerminalSessionSupport.shellQuote(childPIDFile.path) + "\n" +
+            (parentExitsOnTERM ? "trap 'exit 0' TERM\n" : "") + "wait\n"
+        try body.write(to: script, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
+        return (TerminalSessionBackend(tmux: script.path, socketName: label, sessionName: label,
+                                       configurationURL: directory.appendingPathComponent("\(label).conf")), childPIDFile)
+    }
+
+    static func awaitChildPID(_ url: URL) async throws -> pid_t {
+        for _ in 0..<50 {
+            if let value = try? String(contentsOf: url, encoding: .utf8), let pid = pid_t(value.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                return pid
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        preconditionFailure("The isolated terminal fixture did not start its child")
+    }
+
+    static func expectStopped(_ pid: pid_t) async throws {
+        for _ in 0..<100 {
+            if kill(pid, 0) != 0 && errno == ESRCH { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        preconditionFailure("A canceled terminal command left its isolated child running")
+    }
+
     static func main() async throws {
         let tick = String(UnicodeScalar(96))
         let dangerous = "a 'quote' $(touch /tmp/boring-terminal-must-not-exist) " + tick + "id" + tick + " ; \\ end\nline"
@@ -27,6 +59,36 @@ import Foundation
         let missing = TerminalSessionBackend(tmux: nil)
         do { try await missing.start(); preconditionFailure("Missing tmux must report an actionable error") }
         catch { precondition(error.localizedDescription.contains("brew install tmux")) }
+        let fixtureDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("terminal-cancel-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: fixtureDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: fixtureDirectory) }
+
+        let (cancelBackend, cancelPIDFile) = try slowBackend(in: fixtureDirectory, label: "cancel")
+        let cancelStart = ContinuousClock.now
+        let request = Task { try await cancelBackend.snapshot() }
+        let cancelPID = try await awaitChildPID(cancelPIDFile)
+        request.cancel()
+        do {
+            _ = try await request.value
+            preconditionFailure("Canceling a terminal command should throw cancellation")
+        } catch is CancellationError {}
+        let cancelDuration = cancelStart.duration(to: .now)
+        precondition(cancelDuration < .seconds(1), "Cancellation should stop an ignoring command promptly: \(cancelDuration)")
+        try await expectStopped(cancelPID)
+
+        let (deadlineBackend, deadlinePIDFile) = try slowBackend(in: fixtureDirectory, label: "deadline", parentExitsOnTERM: true)
+        let deadlineStart = ContinuousClock.now
+        do {
+            _ = try await deadlineBackend.snapshot()
+            preconditionFailure("A command that exceeds its deadline must fail even if its parent exits on SIGTERM")
+        } catch {
+            precondition((error as NSError).code == ETIMEDOUT, "Timeout must remain an explicit command failure")
+        }
+        let deadlineDuration = deadlineStart.duration(to: .now)
+        precondition(deadlineDuration < .seconds(4), "The three-second command deadline must be bounded: \(deadlineDuration)")
+        try await expectStopped(try await awaitChildPID(deadlinePIDFile))
+        print("Terminal subprocess cancellation and deadline checks passed (cancel: \(cancelDuration), timeout: \(deadlineDuration)).")
+
         guard let tmux = TerminalSessionBackend.tmuxPath else {
             print("Terminal parser checks passed; tmux integration skipped (not installed).")
             return

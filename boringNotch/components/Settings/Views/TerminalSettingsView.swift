@@ -5,6 +5,7 @@ struct TerminalSettingsView: View {
     @Default(.terminalEnabled) private var enabled
     @Default(.terminalApplication) private var application
     @ObservedObject private var terminal = NotchTerminalManager.shared
+    @ViewState private var demandID = UUID()
 
     var body: some View {
         Form {
@@ -43,6 +44,17 @@ struct TerminalSettingsView: View {
         }
         .onAppear {
             application = TerminalApplication.preferred(application).id
+            updateMetadataDemand(enabled)
+        }
+        .onDisappear { terminal.releaseMetadataDemand(demandID) }
+        .onChange(of: enabled) { _, isEnabled in updateMetadataDemand(isEnabled) }
+    }
+
+    private func updateMetadataDemand(_ isEnabled: Bool) {
+        if isEnabled {
+            terminal.acquireMetadataDemand(demandID)
+        } else {
+            terminal.releaseMetadataDemand(demandID)
         }
     }
 }

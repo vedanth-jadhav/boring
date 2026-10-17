@@ -63,6 +63,7 @@ struct ContentView: View {
     private let extendedHoverPadding: CGFloat = 30
     private let zeroHeightHoverPadding: CGFloat = 10
     private let nowPlayingFallbackNoticeWidth: CGFloat = 330
+    private let batteryNotificationSideWidth: CGFloat = 110
     /// Matches the popovers' dismiss delay; long enough to reach a control
     /// inside the panel without closing under the pointer.
     private let hoverExitDelayMilliseconds = 350
@@ -192,7 +193,8 @@ struct ContentView: View {
             chinWidth = nowPlayingFallbackNoticeWidth
         } else if coordinator.expandingView.type == .battery && coordinator.expandingView.show
             && vm.notchState == .closed && showPowerStatusNotifications {
-            chinWidth = 640
+            // Equal wings keep the camera cutout centered on every display.
+            chinWidth += 2 * (batteryNotificationSideWidth + max(topCornerRadius, cornerRadiusInsets.closed.bottom))
         } else if vm.notchState == .closed, !vm.hideOnClosed, musicIsShowing {
             chinWidth += (2 * max(0, displayClosedNotchHeight - 12) + 20 + 2 * liveActivityEdgeMargin + 2)
             if showingInlineMusicPeek { chinWidth += 2 * inlineMusicPeekLabelWidth }
@@ -473,7 +475,7 @@ struct ContentView: View {
         .onChange(of: vm.notchState) { _, state in
             gestureProgress = .zero
             if state == .open && codexUsageDisplay != .off {
-                Task { await CodexUsageStore.shared.refreshAllowance(force: true) }
+                Task { await CodexUsageStore.shared.refreshAllowance() }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
@@ -541,11 +543,14 @@ struct ContentView: View {
                                 Text(batteryModel.statusText)
                                     .font(.subheadline)
                                     .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                             }
+                            .frame(width: batteryNotificationSideWidth, alignment: .leading)
 
                             Rectangle()
                                 .fill(.black)
-                                .frame(width: vm.closedNotchSize.width + 10)
+                                .frame(width: vm.closedNotchSize.width)
 
                             HStack {
                                 BoringBatteryView(
@@ -558,7 +563,7 @@ struct ContentView: View {
                                     isForNotification: true
                                 )
                             }
-                            .frame(width: 76, alignment: .trailing)
+                            .frame(width: batteryNotificationSideWidth, alignment: .trailing)
                         }
                         .frame(height: displayClosedNotchHeight, alignment: .center)
                         } else if coordinator.shouldShowSneakPeek(on: vm.screenUUID) && inlineOSD && (coordinator.sneakPeekState(for: vm.screenUUID).type != .music) && (coordinator.sneakPeekState(for: vm.screenUUID).type != .battery) && vm.notchState == .closed {
@@ -1016,7 +1021,7 @@ extension ContentView {
     }
 
     private func triggerHorizontalMediaFeedback(_ feedback: CGFloat) {
-        withAnimation(.interactiveSpring(response: 0.18, dampingFraction: 0.62)) {
+        withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.18, dampingFraction: 0.62)) {
             horizontalMediaGestureFeedback = feedback
             if vm.notchState == .closed {
                 gestureProgress = 2

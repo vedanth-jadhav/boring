@@ -37,6 +37,9 @@ final class SpotifyController: MediaControllerProtocol {
 
     private var lastArtworkURL: String?
     private var artworkFetchTask: Task<Void, Never>?
+    private var artworkRetryTask: Task<Void, Never>?
+    private var artworkRequestID: UUID?
+    private var artworkRetryNotBefore: Date?
 
     init() {
         setupPlaybackStateChangeObserver()
@@ -58,6 +61,7 @@ final class SpotifyController: MediaControllerProtocol {
     deinit {
         notificationTask?.cancel()
         artworkFetchTask?.cancel()
+        artworkRetryTask?.cancel()
     }
 
     // MARK: - Protocol Implementation
@@ -94,8 +98,18 @@ final class SpotifyController: MediaControllerProtocol {
     }
 
     func updatePlaybackInfo() async {
-        guard let descriptor = try? await fetchPlaybackInfoAsync() else { return }
-        guard descriptor.numberOfItems >= 10 else { return }
+        guard isActive() else {
+            cancelArtworkWork()
+            return
+        }
+        guard let descriptor = try? await fetchPlaybackInfoAsync() else {
+            cancelArtworkWork()
+            return
+        }
+        guard descriptor.numberOfItems >= 10 else {
+            cancelArtworkWork()
+            return
+        }
 
         let isPlaying = descriptor.atIndex(1)?.booleanValue ?? false
         let currentTrack = descriptor.atIndex(2)?.stringValue ?? "Unknown"
@@ -128,33 +142,70 @@ final class SpotifyController: MediaControllerProtocol {
             state.artwork = existingArtwork
         }
 
-    playbackState = state
+        playbackState = state
 
-        if !artworkURL.isEmpty, let url = URL(string: artworkURL) {
-            guard artworkURL != lastArtworkURL || state.artwork == nil else { return }
+        if artworkURL.isEmpty {
+            cancelArtworkWork()
+            return
+        }
+
+        if artworkURL != lastArtworkURL ||
+            (state.artwork == nil && artworkRequestID == nil &&
+             (artworkRetryNotBefore.map { Date() >= $0 } ?? true)) {
+            artworkRetryTask?.cancel()
+            artworkRetryTask = nil
             artworkFetchTask?.cancel()
+            let requestID = UUID()
+            artworkRequestID = requestID
+            lastArtworkURL = artworkURL
+            artworkRetryNotBefore = nil
+            guard let url = URL(string: artworkURL) else {
+                artworkRequestID = nil
+                return
+            }
 
-            let currentState = state
-
-            artworkFetchTask = Task {
+            artworkFetchTask = Task { [weak self] in
                 do {
                     let data = try await ImageService.shared.fetchImageData(from: url)
-
-                    await MainActor.run { [weak self] in
-                        guard let self = self else { return }
-                        var updatedState = currentState
-                        updatedState.artwork = data
-                        self.playbackState = updatedState
-                        self.lastArtworkURL = artworkURL
-                        self.artworkFetchTask = nil
-                    }
+                    guard let self else { return }
+                    guard !Task.isCancelled,
+                          self.artworkRequestID == requestID,
+                          self.lastArtworkURL == artworkURL else { return }
+                    var updatedState = self.playbackState
+                    updatedState.artwork = data
+                    self.playbackState = updatedState
+                    self.artworkFetchTask = nil
+                    self.artworkRequestID = nil
+                    self.artworkRetryNotBefore = nil
                 } catch {
-                    await MainActor.run { [weak self] in
-                        self?.artworkFetchTask = nil
+                    guard let self, self.artworkRequestID == requestID else { return }
+                    self.artworkFetchTask = nil
+                    self.artworkRequestID = nil
+                    self.artworkRetryNotBefore = Date().addingTimeInterval(5)
+                    self.artworkRetryTask?.cancel()
+                    self.artworkRetryTask = Task { [weak self] in
+                        try? await Task.sleep(for: .seconds(5))
+                        guard let self,
+                              !Task.isCancelled,
+                              self.lastArtworkURL == artworkURL,
+                              self.playbackState.artwork == nil else { return }
+                        self.artworkRetryNotBefore = nil
+                        self.lastArtworkURL = nil
+                        await self.updatePlaybackInfo()
                     }
                 }
             }
         }
+    }
+
+    private func cancelArtworkWork() {
+        artworkFetchTask?.cancel()
+        artworkFetchTask = nil
+        artworkRetryTask?.cancel()
+        artworkRetryTask = nil
+        artworkRequestID = nil
+        artworkRetryNotBefore = nil
+        lastArtworkURL = nil
     }
 
 // MARK: - Private Methods
