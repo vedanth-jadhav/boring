@@ -17,9 +17,26 @@ enum SpicyLyricsCredential {
 
     enum StorageError: LocalizedError {
         case unavailable
+        case status(OSStatus)
+        case invalidKey
+        case verificationFailed
         var errorDescription: String? {
-            "Couldn't update the API key in Keychain. Unlock your login keychain and try again."
+            switch self {
+            case .invalidKey: return "Paste a Spicy Lyrics key beginning with sl_sk_ or sl_pk_."
+            case .verificationFailed: return "Couldn't verify the Keychain change. Keep your copy of the key and try again."
+            case .status(errSecUserCanceled): return "Keychain authorization was canceled. Your saved key was kept."
+            case .status(errSecDecode): return "The saved key couldn't be read. Paste a replacement key."
+            case .status(let status) where requiresAuthorization(status):
+                return "macOS needs permission to access your saved key. Use Authorize saved key and try again."
+            case .unavailable, .status:
+                return "Couldn't access macOS Keychain. Unlock your login keychain and try again."
+            }
         }
+    }
+
+    private static func storageError(_ result: LoadResult) -> StorageError {
+        if case .inaccessible(let status) = result { return .status(status) }
+        return .unavailable
     }
 
     private static func identity(service: String) -> [String: Any] {
@@ -70,14 +87,14 @@ enum SpicyLyricsCredential {
     static func authorizeSavedKey(service: String = service) throws -> String {
         #if BORING_LOCAL_BUILD
         if service == Self.service {
-            guard case .loaded(let key) = LyricsKeychainClient.perform("authorize") else { throw StorageError.unavailable }
+            let result = LyricsKeychainClient.perform("authorize")
+            guard case .loaded(let key) = result else { throw storageError(result) }
             return key
         }
         #endif
         return try LegacyKeychainAccess.withInteraction(true) {
-            guard case .loaded(let key) = read(identity: identity(service: service), allowInteraction: true) else {
-                throw StorageError.unavailable
-            }
+            let result = read(identity: identity(service: service), allowInteraction: true)
+            guard case .loaded(let key) = result else { throw storageError(result) }
             return key
         }
     }
@@ -95,14 +112,21 @@ enum SpicyLyricsCredential {
             return status == errSecItemNotFound ? .missing : .inaccessible(status)
         }
         guard let data = item as? Data, let key = String(data: data, encoding: .utf8),
-              !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .inaccessible(errSecDecode) }
+              accepts(key) else { return .inaccessible(errSecDecode) }
         return .loaded(key.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     static func save(_ value: String, service: String = service) throws {
+        guard accepts(value) else { throw StorageError.invalidKey }
         #if BORING_LOCAL_BUILD
         if service == Self.service {
-            guard case .loaded = LyricsKeychainClient.perform("save", value: value) else { throw StorageError.unavailable }
+            let result = LyricsKeychainClient.perform("save", value: value)
+            guard case .loaded = result else { throw storageError(result) }
+            let verified = loadResult()
+            if case .inaccessible = verified { throw storageError(verified) }
+            guard verified == .loaded(value.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+                throw StorageError.verificationFailed
+            }
             return
         }
         #endif
@@ -117,21 +141,25 @@ enum SpicyLyricsCredential {
                 item[kSecAttrAccess as String] = access
                 status = SecItemAdd(item as CFDictionary, nil)
             }
-            guard status == errSecSuccess else { throw StorageError.unavailable }
+            guard status == errSecSuccess else { throw StorageError.status(status) }
         }
     }
 
     static func remove(service: String = service) throws {
         #if BORING_LOCAL_BUILD
         if service == Self.service {
-            guard case .loaded = LyricsKeychainClient.perform("remove") else { throw StorageError.unavailable }
+            let result = LyricsKeychainClient.perform("remove")
+            guard case .loaded = result else { throw storageError(result) }
+            let verified = loadResult()
+            if case .inaccessible = verified { throw storageError(verified) }
+            guard verified == .missing else { throw StorageError.verificationFailed }
             return
         }
         #endif
         try LegacyKeychainAccess.withInteraction(true) {
             let identity = identity(service: service)
             let status = SecItemDelete(identity as CFDictionary)
-            guard status == errSecSuccess || status == errSecItemNotFound else { throw StorageError.unavailable }
+            guard status == errSecSuccess || status == errSecItemNotFound else { throw StorageError.status(status) }
         }
     }
 }

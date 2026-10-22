@@ -14,6 +14,7 @@ cp "$lyrics_check_dir/checks" "$lyrics_check_dir/untrusted"
 codesign --force --sign "${BORING_CODESIGN_IDENTITY:-Boring Notch Octave Local}" \
   --identifier local.vedanth.boringnotch.octave.untrusted-check "$lyrics_check_dir/untrusted"
 "$lyrics_check_dir/checks" save "$lyrics_check_service"
+"$lyrics_check_dir/checks" invalid "$lyrics_check_service"
 "$lyrics_check_dir/checks" read "$lyrics_check_service"
 "$lyrics_check_dir/checks" read "$lyrics_check_service"
 # Rebuild at the same path with different code, then sign with the same certificate and identifier.

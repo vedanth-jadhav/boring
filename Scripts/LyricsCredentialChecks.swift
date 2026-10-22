@@ -9,8 +9,23 @@ import Security
         let service = CommandLine.arguments[2]
         let fixture = "sl_sk_keychain_fixture_01234567890123456789"
         switch CommandLine.arguments[1] {
+        case "invalid":
+            do {
+                try SpicyLyricsCredential.save("not-a-key", service: service)
+                fatalError("Invalid key was accepted")
+            } catch SpicyLyricsCredential.StorageError.invalidKey {}
+            guard SpicyLyricsCredential.loadResult(service: service) == .loaded(fixture) else {
+                fatalError("Invalid replacement destroyed the saved key")
+            }
+            print("PASS: invalid replacement preserves the existing credential")
+        case "probe":
+            switch SpicyLyricsCredential.loadResult(service: service) {
+            case .loaded: print("Credential storage: available (value withheld)")
+            case .missing: print("Credential storage: missing")
+            case .inaccessible(let status): print("Credential storage: inaccessible (\(status))")
+            }
         case "save":
-            try SpicyLyricsCredential.save(fixture, service: service)
+            try SpicyLyricsCredential.save(" \n" + fixture + "\n ", service: service)
             print("PASS: scoped signed-app storage")
         case "authorize":
             guard try SpicyLyricsCredential.authorizeSavedKey(service: service) == fixture else { fatalError("Migration changed the key") }

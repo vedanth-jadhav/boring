@@ -2,48 +2,43 @@ import XCTest
 @testable import boringNotch
 
 final class LyricsPrecisionTests: XCTestCase {
-    func testMajboorLineOnlyLyricsHighlightIndividualWords() {
+    func testMajboorLineOnlyLyricsDoNotInventWordTiming() {
         let lines = LyricLine.parseLRC("[00:13.44] Sachhi Tu Ya Main Jhoota?\n[00:15.62] Hun Ki Karna Haan Haan\n[00:18.87]")
-        assertEstimatedWordHighlights(lines)
+        assertLineOnlyDoesNotGuess(lines)
     }
 
-    func testBandaKaamKaMixedScriptLyricsHighlightIndividualWords() {
+    func testMixedScriptLineOnlyLyricsDoNotInventWordTiming() {
         let lines = LyricLine.parseLRC("[00:03.09] Hmm, सीधा-सीधा रास्ता था\n[00:08.46]")
-        assertEstimatedWordHighlights(lines)
+        assertLineOnlyDoesNotGuess(lines)
     }
 
-    private func assertEstimatedWordHighlights(_ lines: [LyricLine]) {
+    private func assertLineOnlyDoesNotGuess(_ lines: [LyricLine]) {
         let timeline = LyricTimeline(lines: lines)
         XCTAssertFalse(timeline.hasWordTimings)
         for entry in timeline.entries where !entry.words.isEmpty {
             let row = entry.vocalRows.primary!
             XCTAssertFalse(row.hasExactTiming)
-            XCTAssertTrue(row.hasEstimatedTiming)
-            XCTAssertTrue(row.highlightsWords)
+            XCTAssertFalse(row.hasEstimatedTiming)
+            XCTAssertFalse(row.highlightsWords)
             XCTAssertEqual(row.words.map(\.text), entry.line.text.split(whereSeparator: \.isWhitespace).map(String.init))
             XCTAssertEqual(row.start, entry.line.start)
             XCTAssertEqual(row.end, entry.end, accuracy: 0.000001)
-            for (index, word) in row.words.enumerated() {
-                let midpoint = (word.start + word.end) / 2
-                XCTAssertEqual(row.anchor(at: midpoint), index)
-                XCTAssertEqual(row.words.filter { LyricWordPhase(word: $0, elapsed: midpoint).isActive }.count, 1)
-                let phase = LyricWordPhase(word: word, elapsed: midpoint)
-                XCTAssertEqual(phase.visibleSheenOpacity, 1)
-                XCTAssertTrue(phase.phraseInkOpacity > LyricWordPhase(word: word, elapsed: row.start - 0.01).inkOpacity)
+            for word in row.words {
+                XCTAssertEqual(word.start, row.start)
+                XCTAssertEqual(word.end, row.end)
             }
+            XCTAssertFalse(row.shouldAnimate(at: (row.start + row.end) / 2, rate: 1, playing: true, reduceMotion: false))
             XCTAssertFalse(row.isActive(at: row.end))
         }
     }
 
-    func testPhoneticFallbackUsesTheSameClockForHindiAndRomanizedDisplay() {
+    func testLineOnlyScriptAndRomanizationNeverInventWordTiming() {
         let native = LyricLine(start: 1, end: 5, text: "तेरा मेरा प्यार")
         let latin = LyricLine(start: 1, end: 5, text: LyricsRomanizer.romanize(native.text))
         let nativeWords = LyricTimeline(lines: [native]).entries[0].words
         let latinWords = LyricTimeline(lines: [latin]).entries[0].words
         XCTAssertEqual(nativeWords.map(\.start), latinWords.map(\.start))
         XCTAssertEqual(nativeWords.map(\.end), latinWords.map(\.end))
-        XCTAssertTrue(LyricPhoneticTiming.weight(of: "pyaar") < LyricPhoneticTiming.weight(of: "samajh"))
-        XCTAssertEqual(LyricPhoneticTiming.weight(of: "Tu.."), LyricPhoneticTiming.weight(of: "Tu") + 1)
     }
 
     func testEnglishLineFallbackAndExactHindiTimingArePreserved() {
@@ -374,13 +369,13 @@ final class LyricsPrecisionTests: XCTestCase {
             rate: 0, playing: true, duration: 100), 10)
     }
 
-    func testLightIsAlreadyInsideTheTextAtTheExactWordStart() {
+    func testLightBeginsContinuouslyAtTheExactWordStart() {
         let word = LyricLine.Word(text: "held", start: 10, end: 14)
         let onset = LyricWordPhase(word: word, elapsed: 10)
         XCTAssertTrue(onset.isActive)
         XCTAssertEqual(onset.progress, 0)
-        XCTAssertEqual(onset.revealEdge, 0.18)
-        XCTAssertEqual(LyricWordPhase(word: word, elapsed: 12).revealEdge, 0.68, accuracy: 0.000001)
+        XCTAssertEqual(onset.shimmerOpacity(at: 0), 0.6)
+        XCTAssertGreaterThan(LyricWordPhase(word: word, elapsed: 10.04).shimmerOpacity(at: 0), 0.6)
         XCTAssertFalse(LyricWordPhase(word: word, elapsed: 9.999).isActive)
     }
 
@@ -390,10 +385,10 @@ final class LyricsPrecisionTests: XCTestCase {
             var previousOpacity = 0.0
             for frame in 0...120 {
                 let phase = LyricWordPhase(word: word, elapsed: Double(frame) / 60)
-                XCTAssertTrue(phase.inkOpacity >= previousOpacity)
-                previousOpacity = phase.inkOpacity
+                XCTAssertTrue(phase.shimmerOpacity(at: 0.5) >= previousOpacity)
+                previousOpacity = phase.shimmerOpacity(at: 0.5)
             }
-            XCTAssertEqual(previousOpacity, 1)
+            XCTAssertEqual(previousOpacity, 0.94)
         }
     }
 

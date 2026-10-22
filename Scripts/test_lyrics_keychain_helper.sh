@@ -19,7 +19,7 @@ app = pathlib.Path(sys.argv[1])
 for target, identifier, executable, package in (
     (app, 'local.vedanth.boringnotch.octave', 'Checks', 'APPL'),
     (app/'Contents/XPCServices/LyricsKeychain.xpc', 'local.vedanth.boringnotch.octave.LyricsKeychain', 'LyricsKeychain', 'XPC!')):
-    info = {'CFBundleIdentifier': identifier, 'CFBundleExecutable': executable,
+    info = {'CFBundleIdentifier': identifier, 'CFBundleExecutable': executable, 'CFBundleVersion': '1',
             'CFBundlePackageType': package, 'BNKeychainFixtureService': sys.argv[2]}
     if package == 'XPC!': info['XPCService'] = {'ServiceType': 'Application', 'JoinExistingSession': True}
     (target/'Contents/Info.plist').write_bytes(plistlib.dumps(info))
@@ -47,6 +47,7 @@ build_caller
 "$lyrics_helper/Contents/MacOS/LyricsKeychain" verify-migration
 # New keys use the helper directly, with no macOS authorization dialog.
 "$lyrics_app/Contents/MacOS/Checks" save "$lyrics_service"
+"$lyrics_app/Contents/MacOS/Checks" invalid "$lyrics_service"
 "$lyrics_app/Contents/MacOS/Checks" read "$lyrics_service"
 lyrics_hash_before=$(codesign -dv --verbose=4 "$lyrics_helper" 2>&1 | sed -n 's/^CDHash=//p')
 [[ -n "$lyrics_hash_before" ]]
@@ -56,6 +57,28 @@ build_caller -D KEYCHAIN_REBUILT_FIXTURE
 lyrics_hash_after=$(codesign -dv --verbose=4 "$lyrics_helper" 2>&1 | sed -n 's/^CDHash=//p')
 [[ "$lyrics_hash_before" == "$lyrics_hash_after" ]]
 echo "PASS: changed app executable retains prompt-free Keychain access with the same helper hash"
+# The storage identity also survives clean builds and a different compiler/SDK.
+export BORING_LYRICS_HELPER_STORE="$lyrics_dir/persistent-helper"
+export BORING_LYRICS_INSTALLED_APP="$lyrics_app"
+bash Scripts/package_lyrics_keychain.sh "$lyrics_dir/packaged.xpc" "$lyrics_identity"
+export BORING_LYRICS_INSTALLED_APP="$lyrics_dir/no-installed-app"
+SDKROOT=/nonexistent-clean-build-sdk compiler_version=changed-toolchain \
+  bash Scripts/package_lyrics_keychain.sh "$lyrics_dir/clean-build.xpc" "$lyrics_identity"
+cmp "$lyrics_dir/packaged.xpc/Contents/MacOS/LyricsKeychain" "$lyrics_dir/clean-build.xpc/Contents/MacOS/LyricsKeychain"
+echo "PASS: persistent broker survives missing installed app and unavailable build toolchain"
+lyrics_pinned=$(find "$BORING_LYRICS_HELPER_STORE" -name LyricsKeychain.xpc -type d)
+printf 'damaged' >> "$lyrics_pinned/Contents/MacOS/LyricsKeychain"
+if bash Scripts/package_lyrics_keychain.sh "$lyrics_dir/damaged.xpc" "$lyrics_identity" > "$lyrics_dir/damage.log" 2>&1; then
+  echo "FAIL: accepted a damaged credential broker" >&2
+  exit 1
+fi
+[[ ! -e "$lyrics_dir/damaged.xpc" ]]
+echo "PASS: damaged broker fails explicitly instead of silently replacing the storage identity"
+# With no previous installation or pin, bootstrap a complete, validated broker atomically.
+BORING_LYRICS_HELPER_STORE="$lyrics_dir/fresh-store" \
+  bash Scripts/package_lyrics_keychain.sh "$lyrics_dir/fresh.xpc" "$lyrics_identity"
+codesign --verify --strict "$lyrics_dir/fresh.xpc"
+echo "PASS: fresh installations bootstrap a signed, verified credential broker"
 # A different application identifier cannot fetch the key through this helper.
 codesign --force --sign "$lyrics_identity" --identifier local.vedanth.boringnotch.octave.untrusted-check "$lyrics_app"
 "$lyrics_app/Contents/MacOS/Checks" reject-xpc "$lyrics_service"

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F2A1C0000000000000000034 /* LyricTrackQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000033 /* LyricTrackQuery.swift */; };
 		550BC82B5F4A1CE15A2F9417 /* CodexAllowanceTrack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D5BB098A39BA22A78CBDA45 /* CodexAllowanceTrack.swift */; };
 		934E67E53A17CD4CF0055210 /* CodexModelDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3214CFB170B14046994D0C0 /* CodexModelDetail.swift */; };
 		4857FDC907044BBBB2F0BD12 /* ShelfToolFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1EAD41BAE46471F86DFED50 /* ShelfToolFeedback.swift */; };
@@ -190,9 +191,11 @@
 		C1A6A2B02D00000100000001 /* CameraSessionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A6A2AF2D00000100000001 /* CameraSessionEngine.swift */; };
 		C1A6A2B12D00000100000001 /* CameraModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A6A2AE2D00000100000001 /* CameraModel.swift */; };
 		F1F2A0A100000000000000F1 /* AudioCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1F2A0A200000000000000F2 /* AudioCaptureManager.swift */; };
+		BB8120000000000000000001 /* BatteryRuntimeEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB8120000000000000000002 /* BatteryRuntimeEstimator.swift */; };
 		F38DE6482D8243E7008B5C6D /* BatteryActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */; };
 		F2A1C0000000000000000002 /* LyricLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000001 /* LyricLine.swift */; };
 		F2A1C0000000000000000004 /* LyricsRomanizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000003 /* LyricsRomanizer.swift */; };
+		F2A1C0000000000000000032 /* LyricHandoffPhase.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000031 /* LyricHandoffPhase.swift */; };
 		F2A1C0000000000000000006 /* LyricWordPhase.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000005 /* LyricWordPhase.swift */; };
 		F2A1C0000000000000000008 /* LyricPlaybackClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000007 /* LyricPlaybackClock.swift */; };
 		F2A1C000000000000000000A /* LyricTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A1C0000000000000000009 /* LyricTimeline.swift */; };
@@ -256,6 +259,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F2A1C0000000000000000033 /* LyricTrackQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricTrackQuery.swift; sourceTree = "<group>"; };
 		0D5BB098A39BA22A78CBDA45 /* CodexAllowanceTrack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Codex/CodexAllowanceTrack.swift; sourceTree = SOURCE_ROOT; };
 		B3214CFB170B14046994D0C0 /* CodexModelDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Codex/CodexModelDetail.swift; sourceTree = SOURCE_ROOT; };
 		B1EAD41BAE46471F86DFED50 /* ShelfToolFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = boringNotch/components/Shelf/Services/ShelfToolFeedback.swift; sourceTree = SOURCE_ROOT; };
@@ -432,9 +436,11 @@
 		E49B58CAC648403F864E6D78 /* ShelfContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfContextMenu.swift; sourceTree = "<group>"; };
 		EAB1C3E8B149445A9E57C6AF /* NotchWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchWindowManager.swift; sourceTree = "<group>"; };
 		F1F2A0A200000000000000F2 /* AudioCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureManager.swift; sourceTree = "<group>"; };
+		BB8120000000000000000002 /* BatteryRuntimeEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryRuntimeEstimator.swift; sourceTree = "<group>"; };
 		F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryActivityManager.swift; sourceTree = "<group>"; };
 		F2A1C0000000000000000001 /* LyricLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricLine.swift; sourceTree = "<group>"; };
 		F2A1C0000000000000000003 /* LyricsRomanizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsRomanizer.swift; sourceTree = "<group>"; };
+		F2A1C0000000000000000031 /* LyricHandoffPhase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricHandoffPhase.swift; sourceTree = "<group>"; };
 		F2A1C0000000000000000005 /* LyricWordPhase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricWordPhase.swift; sourceTree = "<group>"; };
 		F2A1C0000000000000000007 /* LyricPlaybackClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricPlaybackClock.swift; sourceTree = "<group>"; };
 		F2A1C0000000000000000009 /* LyricTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricTimeline.swift; sourceTree = "<group>"; };
@@ -750,6 +756,7 @@
 				11DB26652EDD0BE1001EA0CF /* LyricsService.swift */,
 				11D58EA12E760AE100FA8377 /* ImageService.swift */,
 				F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */,
+				BB8120000000000000000002 /* BatteryRuntimeEstimator.swift */,
 				112FB7342CCF16F70015238C /* NotchSpaceManager.swift */,
 				EAB1C3E8B149445A9E57C6AF /* NotchWindowManager.swift */,
 				147163992C5D35FF0068B555 /* MusicManager.swift */,
@@ -913,8 +920,10 @@
 				F3C100000000000000000007 /* LyricAttribution.swift */,
 				F3C100000000000000000005 /* SpicyLyricsPayload.swift */,
 				F2A1C000000000000000000B /* LyricVocalFrame.swift */,
+				F2A1C0000000000000000033 /* LyricTrackQuery.swift */,
 				F2A1C0000000000000000009 /* LyricTimeline.swift */,
 				F2A1C0000000000000000007 /* LyricPlaybackClock.swift */,
+				F2A1C0000000000000000031 /* LyricHandoffPhase.swift */,
 				F2A1C0000000000000000005 /* LyricWordPhase.swift */,
 				F2A1C0000000000000000003 /* LyricsRomanizer.swift */,
 				F2A1C000000000000000000F /* RomanizationLexicon.swift */,
@@ -1312,8 +1321,10 @@
 				F3C100000000000000000002 /* SpicyLyricsClient.swift in Sources */,
 				F3C10000000000000000000E /* EnhancedLyricsSettingsModel.swift in Sources */,
 				F2A1C000000000000000000C /* LyricVocalFrame.swift in Sources */,
+				F2A1C0000000000000000034 /* LyricTrackQuery.swift in Sources */,
 				F2A1C000000000000000000A /* LyricTimeline.swift in Sources */,
 				F2A1C0000000000000000008 /* LyricPlaybackClock.swift in Sources */,
+				F2A1C0000000000000000032 /* LyricHandoffPhase.swift in Sources */,
 				F2A1C0000000000000000006 /* LyricWordPhase.swift in Sources */,
 				F2A1C0000000000000000004 /* LyricsRomanizer.swift in Sources */,
 				F2A1C0000000000000000010 /* RomanizationLexicon.swift in Sources */,
@@ -1367,6 +1378,7 @@
 				118EBE3B2E9720C500D54B5A /* ShelfStateViewModel.swift in Sources */,
 				11F747CE2EC75CEA00F841DB /* DragPreviewView.swift in Sources */,
 				F38DE6482D8243E7008B5C6D /* BatteryActivityManager.swift in Sources */,
+				BB8120000000000000000001 /* BatteryRuntimeEstimator.swift in Sources */,
 				118D1FD12E98FF5F00A2FF63 /* SharingStateManager.swift in Sources */,
 				11985BE62F37A3FC00F81585 /* BetterDisplayNotificationModels.swift in Sources */,
 				118EBE252E92DCCB00D54B5A /* AssociatedObject.swift in Sources */,

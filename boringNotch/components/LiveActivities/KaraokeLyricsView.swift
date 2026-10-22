@@ -29,10 +29,12 @@ struct KaraokeLyricsView: View {
     private func lyricContent(at date: Date) -> some View {
         let elapsed = music.estimatedPlaybackPosition(at: date)
         return Group {
-            if let row = lyrics.displayedRow(at: elapsed) {
+            if let context = lyrics.displayedRow(at: elapsed) {
                 // Keep the same view and canvas across line/page handoffs.
                 // Replacing their identities tears down the running clock.
-                lyricRow(row, elapsed: elapsed, sampleDate: date, width: width, size: pointSize)
+                KaraokeLyricLineView(row: context.row, previousRow: context.previous, displayStart: context.start,
+                    elapsed: elapsed, sampleDate: date, playbackRate: music.playbackRate,
+                    isPlaying: music.isPlaying, romanize: romanizeLyrics, width: width, pointSize: pointSize)
             } else if lyrics.timedLyrics.isEmpty {
                 let plain = lyrics.currentLyrics.components(separatedBy: .newlines)
                     .first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? ""
@@ -46,9 +48,4 @@ struct KaraokeLyricsView: View {
         .transaction { $0.animation = nil }
     }
 
-    private func lyricRow(_ row: LyricVocalFrame.Row, elapsed: Double, sampleDate: Date, width: CGFloat, size: CGFloat) -> some View {
-        KaraokeLyricLineView(row: row, elapsed: elapsed, sampleDate: sampleDate,
-                             playbackRate: music.playbackRate, isPlaying: music.isPlaying, romanize: romanizeLyrics,
-                             width: width, pointSize: size)
-    }
 }

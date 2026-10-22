@@ -58,8 +58,10 @@ final class LyricsService: ObservableObject {
     private var fetchContext: FetchContext?
     private var configurationTask: Task<Void, Never>?
     private var preferenceSubscription: AnyCancellable?
+    private let webSession: URLSession
 
-    private init() {
+    init(webSession: URLSession = .shared) {
+        self.webSession = webSession
         lyricsCache.countLimit = 80
         enhancedCache.countLimit = 80
         // An existing personal key represents the earlier explicit opt-in.
@@ -93,12 +95,15 @@ final class LyricsService: ObservableObject {
         activeUseEnhanced = useEnhancedLyrics ?? Defaults[.enableEnhancedLyrics]
         fetchContext = FetchContext(bundleIdentifier: bundleIdentifier, title: title, artist: artist,
                                     preferProvider: preferProvider, album: album, duration: duration)
+        let query = LyricTrackQuery(title: title, artist: artist, album: album, duration: duration,
+                                   bundleIdentifier: bundleIdentifier)
         // A provider's quick line response must not cancel the richer import.
         // Lyrics from Spicy replace both text and timestamps as one payload.
         if activeUseEnhanced {
           spicyFetchTask = Task(priority: .utility) { [weak self] in
             guard let self else { return }
-            let payload = await SpicyLyricsClient.shared.fetch(title: title, artist: artist, album: album, duration: duration)
+            let payload = await SpicyLyricsClient.shared.fetch(title: query.title, artist: query.artist,
+                                                             album: query.album, duration: query.duration)
             guard !Task.isCancelled, self.activeUseEnhanced, self.activeCacheKey == cacheKey, let payload else { return }
             self.setProviderLyrics(payload.lines, plainLyrics: payload.plain, title: title, artist: artist,
                                    attribution: payload.attribution)
@@ -106,14 +111,14 @@ final class LyricsService: ObservableObject {
         }
         if let cached = preferredEntry(for: cacheKey) {
             apply(cached)
-            return
+            if !cached.timed.isEmpty { return }
+        } else {
+            isFetchingLyrics = true
+            currentLyrics = ""
+            syncedLyrics = []
+            timedLyrics = []
+            attribution = nil
         }
-
-        isFetchingLyrics = true
-        currentLyrics = ""
-        syncedLyrics = []
-        timedLyrics = []
-        attribution = nil
 
         let task = Task { [weak self] in
             guard let self = self else { return }
@@ -125,7 +130,7 @@ final class LyricsService: ObservableObject {
                 do { try await Task.sleep(for: .seconds(2)) }
                 catch { return }
                 guard !Task.isCancelled, self.activeCacheKey == cacheKey,
-                      self.lyricsCache.object(forKey: cacheKey as NSString) == nil else { return }
+                      (self.lyricsCache.object(forKey: cacheKey as NSString)?.precision ?? 0) == 0 else { return }
             }
 
             // Try Apple Music first if applicable
@@ -133,30 +138,29 @@ final class LyricsService: ObservableObject {
                 if let lyrics = await self.fetchAppleMusicLyrics() {
                     guard !Task.isCancelled else { return }
                     await MainActor.run {
-                        self.currentLyrics = lyrics
-                        self.syncedLyrics = []
-                        self.timedLyrics = []
-                        self.isFetchingLyrics = false
-                        self.lyricsCache.setObject(LyricsEntry(plain: lyrics, synced: []), forKey: cacheKey as NSString)
+                        if (self.lyricsCache.object(forKey: cacheKey as NSString)?.precision ?? 0) == 0 {
+                            self.lyricsCache.setObject(LyricsEntry(plain: lyrics, synced: []), forKey: cacheKey as NSString)
+                        }
+                        if let selected = self.preferredEntry(for: cacheKey) { self.apply(selected) }
                     }
-                    return
                 }
             }
 
             // Fallback to web
             guard !Task.isCancelled else { return }
-            let webResult = await self.fetchLyricsFromWeb(title: title, artist: artist)
+            let webResult = await self.fetchLyricsFromWeb(query: query)
 
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard self.activeCacheKey == cacheKey else { return }
-                self.currentLyrics = webResult.plain
-                self.syncedLyrics = webResult.synced
-                self.timedLyrics = webResult.timed
-                self.isFetchingLyrics = false
                 if !webResult.plain.isEmpty {
-                    self.lyricsCache.setObject(LyricsEntry(plain: webResult.plain, synced: webResult.synced, timed: webResult.timed), forKey: cacheKey as NSString)
+                    let entry = LyricsEntry(plain: webResult.plain, synced: webResult.synced, timed: webResult.timed)
+                    if entry.precision >= (self.lyricsCache.object(forKey: cacheKey as NSString)?.precision ?? -1) {
+                        self.lyricsCache.setObject(entry, forKey: cacheKey as NSString)
+                    }
                 }
+                if let selected = self.preferredEntry(for: cacheKey) { self.apply(selected) }
+                else { self.isFetchingLyrics = false }
             }
         }
 
@@ -235,8 +239,10 @@ final class LyricsService: ObservableObject {
         if let cached = cache.object(forKey: key as NSString), cached.precision > entry.precision { return }
         cache.setObject(entry, forKey: key as NSString)
         guard activeCacheKey == key, let selected = preferredEntry(for: key) else { return }
-        currentFetchTask?.cancel()
-        currentFetchTask = nil
+        if selected.precision > 0 {
+            currentFetchTask?.cancel()
+            currentFetchTask = nil
+        }
         apply(selected)
     }
 
@@ -249,8 +255,9 @@ final class LyricsService: ObservableObject {
         timeline.displayed(at: elapsed, duration: duration)
     }
 
-    func displayedRow(at elapsed: Double) -> LyricVocalFrame.Row? {
-        timeline.displayedPrimary(at: elapsed)?.vocalRows.primary
+    func displayedRow(at elapsed: Double) -> (row: LyricVocalFrame.Row, previous: LyricVocalFrame.Row?, start: Double)? {
+        guard let entry = timeline.displayedPrimary(at: elapsed), let row = entry.vocalRows.primary else { return nil }
+        return (row, timeline.previousDisplayedPrimary(at: elapsed)?.vocalRows.primary, entry.line.start)
     }
 
     func vocalFrame(at elapsed: Double, duration: Double) -> LyricVocalFrame {
@@ -348,112 +355,27 @@ final class LyricsService: ObservableObject {
         return nil
     }
 
-    private func fetchLyricsFromWeb(title: String, artist: String) async -> (plain: String, synced: [(time: Double, text: String)], timed: [LyricLine]) {
-        let cleanTitle = normalizedQuery(title)
-        let cleanArtist = normalizedQuery(artist)
-
-        guard let encodedTitle = cleanTitle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
-            return ("", [], [])
-        }
-
-        // Try with artist first, then without if no results
-        let searchStrategies: [String] = {
-            var strategies: [String] = []
-
-            // Strategy 1: Search with artist (if provided)
-            if !cleanArtist.isEmpty,
-               let encodedArtist = cleanArtist.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
-                strategies.append("https://lrclib.net/api/search?track_name=\(encodedTitle)&artist_name=\(encodedArtist)")
-            }
-
-            // Strategy 2: Search with title only (always include as fallback)
-            strategies.append("https://lrclib.net/api/search?track_name=\(encodedTitle)")
-
-            return strategies
-        }()
-
-        for urlString in searchStrategies {
-            guard let url = URL(string: urlString) else { continue }
-
+    private func fetchLyricsFromWeb(query: LyricTrackQuery) async -> (plain: String, synced: [(time: Double, text: String)], timed: [LyricLine]) {
+        let strategies = query.artist.isEmpty ? [false] : [true, false]
+        for includeArtist in strategies {
+            guard !Task.isCancelled else { return ("", [], []) }
             do {
-                var request = URLRequest(url: url)
+                var request = URLRequest(url: query.searchURL(includeArtist: includeArtist))
                 request.timeoutInterval = 10
-
-                let (data, response) = try await URLSession.shared.data(for: request)
-                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                    continue
-                }
-
-                if let jsonArray = try JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-                   let first = findBestMatch(in: jsonArray, title: cleanTitle, artist: cleanArtist) {
-                    let plain = (first["plainLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    let synced = (first["syncedLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-
-                    if !plain.isEmpty || !synced.isEmpty {
-                        let resolvedPlain = plain.isEmpty ? synced : plain
-                        let timed = LyricLine.parseLRC(synced)
-                        let parsedSynced = timed.map { (time: $0.start, text: $0.text) }
-                        return (resolvedPlain, parsedSynced, timed)
-                    }
-                }
+                let (data, response) = try await webSession.data(for: request)
+                guard !Task.isCancelled, let http = response as? HTTPURLResponse, http.statusCode == 200,
+                      let results = try JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+                      let match = query.bestMatch(in: results) else { continue }
+                let plain = (match["plainLyrics"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                let synced = (match["syncedLyrics"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                let timed = LyricLine.parseLRC(synced)
+                return (plain.isEmpty ? timed.map(\.text).joined(separator: "\n") : plain,
+                        timed.map { (time: $0.start, text: $0.text) }, timed)
             } catch {
-                continue
+                if Task.isCancelled { return ("", [], []) }
             }
         }
-
         return ("", [], [])
-    }
-
-    /// Find the best matching result from the search results based on title similarity
-    private func findBestMatch(in results: [[String: Any]], title: String, artist: String) -> [String: Any]? {
-        guard !results.isEmpty else { return nil }
-
-        // If only one result, use it
-        if results.count == 1 { return results.first }
-
-        let normalizedTitle = title.lowercased()
-        let normalizedArtist = artist.lowercased()
-
-        // Score each result and pick the best
-        var bestResult: [String: Any]?
-        var bestScore = 0
-
-        for result in results {
-            var score = 0
-
-            // Check title match
-            if let resultTitle = result["trackName"] as? String {
-                if resultTitle.lowercased() == normalizedTitle {
-                    score += 10
-                } else if resultTitle.lowercased().contains(normalizedTitle) || normalizedTitle.contains(resultTitle.lowercased()) {
-                    score += 5
-                }
-            }
-
-            // Check artist match (bonus if provided and matches)
-            if !normalizedArtist.isEmpty, let resultArtist = result["artistName"] as? String {
-                if resultArtist.lowercased() == normalizedArtist {
-                    score += 8
-                } else if resultArtist.lowercased().contains(normalizedArtist) || normalizedArtist.contains(resultArtist.lowercased()) {
-                    score += 4
-                }
-            }
-
-            // Prefer results with lyrics
-            if let plain = result["plainLyrics"] as? String, !plain.isEmpty {
-                score += 2
-            }
-            if let synced = result["syncedLyrics"] as? String, !synced.isEmpty {
-                score += 3
-            }
-
-            if score > bestScore {
-                bestScore = score
-                bestResult = result
-            }
-        }
-
-        return bestResult ?? results.first
     }
 
     private func normalizedQuery(_ string: String) -> String {

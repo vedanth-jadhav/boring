@@ -538,7 +538,10 @@ final class MusicManager: ObservableObject {
                 self.updateSneakPeek()
             }
 
-            // Fetch lyrics on content change
+        }
+
+        // Artwork delivery must not cancel and restart a song's lyric lookup.
+        if titleChanged || artistChanged || albumChanged || bundleChanged || (songDuration <= 0 && state.duration > 0) {
             self.fetchLyricsIfAvailable(bundleIdentifier: state.bundleIdentifier, title: state.title, artist: state.artist,
                                         album: state.album, duration: state.duration)
         }

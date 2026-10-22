@@ -191,6 +191,7 @@ struct BatteryMenuView: View {
                 }
                 if !isCharging && !isPluggedIn && timeToDischarge > 0 {
                     Label("Time Until Empty: \(formattedTimeToDischarge)", systemImage: "clock")
+                        .help("Estimated from remaining charge and recent electrical load. Changes in workload will change this estimate.")
                         .font(.subheadline)
                         .fontWeight(.regular)
                 } else if !isCharging && !isPluggedIn && timeToDischarge == -1 {

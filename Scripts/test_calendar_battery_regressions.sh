@@ -35,6 +35,7 @@ runtime_defaults_objects=("$runtime_binary_dir/Defaults.build/"*.o)
   -I "$runtime_binary_dir/Modules" \
   boringNotch/managers/CalendarManager.swift \
   boringNotch/managers/BatteryActivityManager.swift \
+  boringNotch/managers/BatteryRuntimeEstimator.swift \
   boringNotch/models/BatteryStatusViewModel.swift \
   Scripts/CalendarBatteryRuntimeSupport.swift \
   "${runtime_defaults_objects[@]}" \

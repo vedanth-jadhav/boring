@@ -7,7 +7,7 @@ struct LyricVocalFrame {
         let isBackground: Bool
         let hasExactTiming: Bool
         let hasEstimatedTiming: Bool
-        var highlightsWords: Bool { hasExactTiming || hasEstimatedTiming }
+        var highlightsWords: Bool { hasExactTiming }
         let text: String
         let start: Double
         let end: Double
@@ -44,6 +44,7 @@ struct LyricVocalFrame {
         }
 
         func anchor(at elapsed: Double) -> Int {
+            guard hasExactTiming else { return 0 }
             var low = 0
             var high = anchorStarts.count
             while low < high {
@@ -58,9 +59,13 @@ struct LyricVocalFrame {
         }
 
         func animationInterval(rate: Double) -> Double {
-            // One display clock for the entire row. Dense vocals need more
-            // samples; a held note or line sheen can use half the frame rate.
+            // Preserve the redraw budget: smoother paint must not multiply
+            // frame work on ProMotion screens or create a timer per word.
             hasExactTiming || highlightsWords && shortestWordDuration / max(0.01, rate) < 0.25 ? 1.0 / 60 : 1.0 / 30
+        }
+
+        func shouldAnimate(at elapsed: Double, rate: Double, playing: Bool, reduceMotion: Bool) -> Bool {
+            hasExactTiming && playing && rate > 0 && !reduceMotion && isActive(at: elapsed)
         }
     }
 

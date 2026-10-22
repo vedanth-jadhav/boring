@@ -17,7 +17,7 @@ struct EnhancedLyricsSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .disabled(!showLyrics || !model.hasSavedKey || model.isBusy)
+            .disabled(!showLyrics || !model.hasSavedKey || model.needsKeychainAccess || model.storageUnavailable || model.isBusy)
 
             LabeledContent("Spicy Lyrics API key") {
                 SecureField("API key", text: $model.draftKey,
@@ -37,6 +37,13 @@ struct EnhancedLyricsSettingsView: View {
                 }
                 Button("Save & Enable") { model.saveAndEnable() }
                     .disabled(!model.canSave)
+                if model.storageUnavailable {
+                    Button("Retry storage") { Task { await model.loadStatus() } }
+                        .disabled(model.isBusy)
+                } else if model.hasSavedKey && !model.needsKeychainAccess {
+                    Button("Check key", action: model.checkSavedKey)
+                        .disabled(model.isBusy)
+                }
                 if model.isBusy {
                     ProgressView().controlSize(.small)
                     Text(model.progressText).font(.caption).foregroundStyle(.secondary)
@@ -55,7 +62,7 @@ struct EnhancedLyricsSettingsView: View {
                     .accessibilityLabel(message)
             } else {
                 Text(model.hasSavedKey
-                     ? (showLyrics ? "Your API key is saved securely in macOS Keychain." : "Turn on Show lyrics above to use your saved key.")
+                     ? (showLyrics ? "Saved in macOS Keychain. Kept across app rebuilds." : "Turn on Show lyrics above to use your saved key.")
                      : "Add your own API key to enable enhanced lyrics.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -76,7 +83,7 @@ struct EnhancedLyricsSettingsView: View {
         } header: {
             Text("Enhanced lyrics")
         } footer: {
-            Text("Fetches lyric text and timing once per song, then reuses a local cache. Songs without matching word timings use regular lyrics. Turning this off keeps your saved key.")
+            Text("Saving works offline. Use Check key to test access to Spicy Lyrics. Lyrics are cached per song; songs without matching word timings use regular lyrics. Turning this off keeps your saved key.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

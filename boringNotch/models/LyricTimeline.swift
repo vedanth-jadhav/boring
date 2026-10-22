@@ -24,7 +24,6 @@ struct LyricTimeline {
 
     init(lines: [LyricLine]) {
         let identity = UUID().uuidString
-        let usePhoneticTiming = LyricPhoneticTiming.isSupported(in: lines)
         var prepared: [Entry] = []
         var concurrent = false
         var nextStarts = [Double?](repeating: nil, count: lines.count)
@@ -39,12 +38,11 @@ struct LyricTimeline {
             let line = lines[index]
             let next = nextStarts[index]
             let end = line.effectiveEnd(nextStart: next, duration: .greatestFiniteMagnitude)
-            let words = line.resolvedWords(until: end, usePhoneticTiming: usePhoneticTiming)
+            let words = line.resolvedWords(until: end)
             if words.contains(where: \.isBackground) { concurrent = true }
             if let previous = prepared.last, previous.end > line.start { concurrent = true }
             prepared.append(Entry(index: index, line: line, end: end, nextStart: next, words: words,
-                vocalRows: .init(words: words, identity: "\(identity):\(index)", hasExactTiming: !line.words.isEmpty,
-                                hasEstimatedTiming: line.words.isEmpty && usePhoneticTiming)))
+                vocalRows: .init(words: words, identity: "\(identity):\(index)", hasExactTiming: !line.words.isEmpty)))
         }
         entries = prepared
         hasWordTimings = lines.contains { !$0.words.isEmpty }
@@ -93,6 +91,16 @@ struct LyricTimeline {
 
     /// A single stable reading lane, independent of overlapping backing vocals.
     func displayedPrimary(at elapsed: Double) -> Entry? {
+        guard let index = displayedIndex(at: elapsed) else { return nil }
+        return displayEntries[index]
+    }
+
+    func previousDisplayedPrimary(at elapsed: Double) -> Entry? {
+        guard let index = displayedIndex(at: elapsed), index > 0 else { return nil }
+        return displayEntries[index - 1]
+    }
+
+    private func displayedIndex(at elapsed: Double) -> Int? {
         guard elapsed.isFinite, elapsed >= 0, !displayEntries.isEmpty else { return nil }
         var low = 0
         var high = displayEntries.count
@@ -102,7 +110,7 @@ struct LyricTimeline {
         }
         // Preview the first phrase during the intro, then hold each phrase
         // until its successor starts. Empty LRC markers cannot blank the row.
-        return displayEntries[max(0, low - 1)]
+        return max(0, low - 1)
     }
 
     func active(at elapsed: Double, duration: Double) -> [Entry] {

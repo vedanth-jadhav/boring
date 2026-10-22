@@ -6,14 +6,98 @@
   const originalFetch = window.fetch.bind(window);
   const handlers = new Map();
   let deck = null;
+  const observedDecks = new Set();
   let buffering = false;
+  let lastAudioTime = null;
   let lastSnapshot = "";
   let lastPublishedAt = -Infinity;
   let latestSeek = 0;
+  let seekSession = null;
   let playerStore = null;
   let unsubscribePlayer = null;
   let lyricTrackID = null;
   let lyricRequest = null;
+  let lyricRetry = null;
+  let lyricGeneration = 0;
+  const lyricCache = new Map();
+  const lyricKey = track => track?.id ? JSON.stringify([track.id, track.title, track.artist?.name]) : null;
+  let publishQueued = false;
+  let artworkRequest = null;
+  let artworkTimeout = null;
+  let currentArtworkSources = [];
+  const browserArtworkURLs = new Map();
+  let artworkReference = 0;
+  function artworkSources(track, metadata) {
+    const album = track?.album;
+    const sources = [album?.cover_big, album?.cover_xl, album?.cover_medium, album?.cover_small];
+    if (!track || track.title === metadata?.title) {
+      const covers = [...(metadata?.artwork || [])];
+      const score = cover => {
+        const size = parseInt(cover.sizes, 10);
+        return !size ? Infinity : size >= 500 ? size : 100000 - size;
+      };
+      covers.sort((a, b) => score(a) - score(b));
+      sources.push(...covers.map(cover => cover.src));
+    }
+    let budget = 150000;
+    const result = [...new Set(sources.flatMap(source => {
+      if (typeof source !== "string" || !source || source.length > 7000000) return [];
+      try {
+        const url = new URL(source, location.origin);
+        if (["blob:", "data:"].includes(url.protocol)) {
+          let reference = [...browserArtworkURLs].find(([, value]) => value === url.href)?.[0];
+          if (!reference) {
+            reference = `page-artwork:${++artworkReference}`;
+            browserArtworkURLs.set(reference, url.href);
+          }
+          return [reference];
+        }
+        return url.protocol === "https:" && url.href.length <= 150000 && !/\/(undefined|null)$/.test(url.pathname) ? [url.href] : [];
+      } catch (_) { return []; }
+    }))].filter(source => { budget -= source.length; return budget >= 0; }).slice(0, 8);
+    for (const reference of browserArtworkURLs.keys()) if (!result.includes(reference)) browserArtworkURLs.delete(reference);
+    return result;
+  }
+
+  async function requestBrowserArtwork({url, requestID}) {
+    if (!currentArtworkSources.includes(url) || typeof requestID !== "string") return;
+    artworkRequest?.abort();
+    clearTimeout(artworkTimeout);
+    const request = new AbortController();
+    artworkRequest = request;
+    const track = lyricKey(playerStore?.getState?.().currentTrack);
+    const timeout = setTimeout(() => request.abort(), 8000);
+    artworkTimeout = timeout;
+    let bitmap;
+    try {
+      // Browser cache/session access also supports blob and local artwork URLs.
+      const response = await originalFetch(browserArtworkURLs.get(url) || url, {cache: "force-cache", signal: request.signal});
+      if (!response.ok) return;
+      const blob = await response.blob();
+      if (blob.size > 5000000 || request.signal.aborted) return;
+      bitmap = await createImageBitmap(blob, {resizeWidth: 512, resizeHeight: 512, resizeQuality: "high"});
+      const canvas = new OffscreenCanvas(512, 512);
+      canvas.getContext("2d").drawImage(bitmap, 0, 0, 512, 512);
+      const thumbnail = await canvas.convertToBlob({type: "image/jpeg", quality: 0.85});
+      if (thumbnail.size > 300000 || request.signal.aborted ||
+          track !== lyricKey(playerStore?.getState?.().currentTrack) || !currentArtworkSources.includes(url)) return;
+      const bytes = new Uint8Array(await thumbnail.arrayBuffer());
+      let binary = "";
+      for (let offset = 0; offset < bytes.length; offset += 8192) binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+      window.postMessage({source: "boring-notch-octave", type: "artwork", url, requestID, data: btoa(binary)}, location.origin);
+    } catch (_) {
+      // Native URL candidates and retries remain available if CORS blocks this fallback.
+    } finally {
+      bitmap?.close();
+      clearTimeout(timeout);
+      if (artworkRequest === request) artworkRequest = null;
+    }
+  }
+  function schedulePublish() {
+    if (publishQueued) return;
+    publishQueued = true;
+    queueMicrotask(() => { publishQueued = false; publish(true); });
+  }
   const media = navigator.mediaSession;
   const originalHandler = media.setActionHandler.bind(media);
   media.setActionHandler = (action, handler) => {
@@ -23,12 +107,13 @@
   };
 
   function bindPlayerStore(store) {
+    store = store ?? null;
     if (playerStore === store) return;
     unsubscribePlayer?.();
     playerStore = store;
     unsubscribePlayer = store?.subscribe?.((state, previous) => {
-      if (state.currentTrack?.id !== previous.currentTrack?.id ||
-          state.shuffle !== previous.shuffle || state.smartShuffle !== previous.smartShuffle) publish(true);
+      if (state.currentTrack !== previous?.currentTrack ||
+          state.shuffle !== previous?.shuffle || state.smartShuffle !== previous?.smartShuffle) schedulePublish();
     });
     publish(true);
   }
@@ -60,46 +145,104 @@
     });
   }
 
-  async function requestLyrics(track) {
-    if (!track?.id || track.id === lyricTrackID) return;
-    lyricTrackID = track.id;
+  async function requestLyrics(track, attempt = 0) {
+    const key = lyricKey(track);
+    if (key === lyricTrackID && attempt === 0) return;
+    lyricTrackID = key;
+    const generation = ++lyricGeneration;
+    clearTimeout(lyricRetry);
     lyricRequest?.abort();
+    lyricRequest = null;
+    if (!key) return;
+    const cached = lyricCache.get(key);
+    if (cached) {
+      lyricCache.delete(key);
+      lyricCache.set(key, cached);
+      window.postMessage(cached, location.origin);
+      return;
+    }
     const request = new AbortController();
     lyricRequest = request;
+    const timeout = setTimeout(() => request.abort(), 8000);
     const title = track.title || "";
     const artist = track.artist?.name || "";
     try {
       const response = await originalFetch("https://api.octavestreaming.com/api/lyrics", {method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify({id: track.id, title, artist, album: track.album?.title || "",
           duration: track.duration || 0}), signal: request.signal});
+      if (!response.ok) throw new Error("Lyrics HTTP failure");
       const body = await response.json();
-      if (request.signal.aborted) return;
-      window.postMessage({source: "boring-notch-octave", type: "lyrics", title, artist,
+      if (generation !== lyricGeneration) return;
+      if (request.signal.aborted) throw new Error("Lyrics timed out");
+      if (!body.success) throw new Error("Lyrics unavailable");
+      const message = {source: "boring-notch-octave", type: "lyrics", title, artist,
         lines: body.success ? parseLyrics(body) : [],
-        plainLyrics: body.success && !body.synced && !body.richSync?.length ? body.lyrics || "" : ""}, location.origin);
+        plainLyrics: body.success && !body.synced && !body.richSync?.length ? body.lyrics || "" : ""};
+      // Bound both retained memory and native-message size for pathological responses.
+      if (JSON.stringify(message).length > 200000) throw new Error("Lyrics too large");
+      lyricCache.set(key, message);
+      if (lyricCache.size > 12) lyricCache.delete(lyricCache.keys().next().value);
+      window.postMessage(message, location.origin);
     } catch (_) {
-      if (!request.signal.aborted) window.postMessage({source: "boring-notch-octave", type: "lyrics",
-        title, artist, lines: []}, location.origin);
+      if (generation !== lyricGeneration) return;
+      if (attempt < 2) lyricRetry = setTimeout(() => requestLyrics(track, attempt + 1), attempt === 0 ? 750 : 2000);
+      else window.postMessage({source: "boring-notch-octave", type: "lyrics", title, artist, lines: []}, location.origin);
+    } finally {
+      clearTimeout(timeout);
+      if (lyricRequest === request) lyricRequest = null;
     }
   }
 
   function publish(force = false) {
     const engine = window.__octaveEngine;
     const audio = engine?.active;
+    const decks = new Set([audio, engine?.a, engine?.b, engine?.airEl].filter(Boolean));
+    for (const item of observedDecks) if (!decks.has(item)) {
+      for (const name of events) item.removeEventListener(name, handleMediaEvent);
+      observedDecks.delete(item);
+    }
+    for (const item of decks) if (!observedDecks.has(item)) {
+      for (const name of events) item.addEventListener(name, handleMediaEvent);
+      observedDecks.add(item);
+    }
     if (audio !== deck) {
-      if (deck) for (const name of events) deck.removeEventListener(name, handleMediaEvent);
       deck = audio || null;
       buffering = !!audio && !audio.paused && audio.readyState < 3;
-      if (deck) for (const name of events) deck.addEventListener(name, handleMediaEvent);
+      lastAudioTime = null;
     }
-    const metadata = media.metadata;
-    if (!audio || !metadata?.title) return;
+    // A background tab can miss `playing` after `waiting`. Actual progress
+    // repairs the clock without treating a merely ready, stalled deck as playing.
+    if (buffering && lastAudioTime !== null && audio?.currentTime > lastAudioTime + 0.01) buffering = false;
+    lastAudioTime = audio?.currentTime ?? null;
     const player = playerStore?.getState?.();
     requestLyrics(player?.currentTrack);
-    const artwork = metadata.artwork?.at(-1)?.src || "";
+    const track = player?.currentTrack;
+    const metadata = track?.title && track.title !== media.metadata?.title
+      ? {title: track.title, artist: track.artist?.name || "", album: track.album?.title || ""}
+      : media.metadata;
+    if (!audio || !metadata?.title) {
+      if (lastSnapshot && !player?.currentTrack && !metadata?.title) {
+        artworkRequest?.abort();
+        clearTimeout(artworkTimeout);
+        currentArtworkSources = [];
+        browserArtworkURLs.clear();
+        lastSnapshot = "";
+        window.postMessage({source: "boring-notch-octave", type: "state", title: "", artist: "",
+          position: 0, duration: 0, playing: false}, location.origin);
+      }
+      return;
+    }
+    const sources = artworkSources(player?.currentTrack, metadata);
+    const artwork = sources[0] || "";
+    if (artwork !== currentArtworkSources[0]) {
+      artworkRequest?.abort();
+      clearTimeout(artworkTimeout);
+    }
+    currentArtworkSources = sources;
     const sampledAt = performance.timeOrigin + performance.now();
     const state = {type: "state", sampledAt, clockDiscontinuity: force === true, title: metadata.title, artist: metadata.artist || "",
-      album: metadata.album || "", artwork, position: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+      trackID: String(player?.currentTrack?.id || ""),
+      album: metadata.album || "", artwork, artworks: sources, position: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
       duration: Number.isFinite(audio.duration) ? audio.duration : 0,
       playing: !audio.paused && !audio.ended, rate: buffering ? 0 : (Number.isFinite(audio.playbackRate) ? Math.max(0, audio.playbackRate) : 1),
       shuffle: !!player?.shuffle, smartShuffle: !!player?.smartShuffle,
@@ -109,7 +252,7 @@
     // position anchors are sent on discontinuities and a slow heartbeat.
     const {sampledAt: _sampledAt, position: _position, clockDiscontinuity: _clockDiscontinuity, ...metadataState} = state;
     const fingerprint = JSON.stringify(metadataState);
-    if (force === true || fingerprint !== lastSnapshot || sampledAt - lastPublishedAt >= 5000) {
+    if (force === true || fingerprint !== lastSnapshot || state.playing && sampledAt - lastPublishedAt >= 5000) {
       lastSnapshot = fingerprint;
       lastPublishedAt = sampledAt;
       window.postMessage(state, location.origin);
@@ -117,19 +260,30 @@
   }
   const events = ["play", "pause", "playing", "waiting", "canplay", "timeupdate", "seeked", "seeking", "loadedmetadata", "durationchange", "volumechange", "ratechange", "ended", "emptied"];
   function handleMediaEvent(event) {
-    if (event.type === "waiting") buffering = true;
-    else if (event.type === "playing" || event.type === "canplay") buffering = false;
-    publish(event.type !== "timeupdate");
+    const activeEvent = !event.currentTarget || event.currentTarget === window.__octaveEngine?.active;
+    if (event.type === "timeupdate") {
+      if (!buffering && window.__octaveEngine?.active === deck && performance.timeOrigin + performance.now() - lastPublishedAt < 5000) return;
+      publish();
+      return;
+    }
+    if (activeEvent && event.type === "waiting") buffering = true;
+    else if (activeEvent && (event.type === "playing" || event.type === "canplay")) buffering = false;
+    schedulePublish();
   }
   // Media events can stop in background tabs. Refresh anchors when delivery
   // resumes; a paused page needs no periodic native messages.
-  setInterval(() => { if (deck && !deck.paused && !deck.ended) publish(); }, 5000);
+  setInterval(() => {
+    // Recheck paused decks too: a missed pause/resume or replaced store must
+    // not leave the last snapshot stuck forever. Unchanged pauses stay quiet.
+    if (window.__octavePlayerStore !== playerStore) bindPlayerStore(window.__octavePlayerStore);
+    publish();
+  }, 5000);
   const descriptor = Object.getOwnPropertyDescriptor(MediaSession.prototype, "metadata");
   if (descriptor?.set) {
     Object.defineProperty(media, "metadata", {
       configurable: true,
       get: () => descriptor.get.call(media),
-      set(value) { descriptor.set.call(media, value); queueMicrotask(() => publish(true)); }
+      set(value) { descriptor.set.call(media, value); schedulePublish(); }
     });
   }
 
@@ -138,7 +292,7 @@
   Object.defineProperty(window, "__octaveEngine", {
     configurable: true,
     get: () => engineValue,
-    set(value) { engineValue = value; queueMicrotask(() => publish(true)); }
+    set(value) { engineValue = value; schedulePublish(); }
   });
   let storeValue = window.__octavePlayerStore;
   Object.defineProperty(window, "__octavePlayerStore", {
@@ -150,9 +304,13 @@
 
   window.addEventListener("message", event => {
     if (event.source !== window || event.origin !== location.origin || event.data?.source !== "boring-notch-command") return;
-    const {action, position, sequence, volume} = event.data;
-    if (action === "seek") {
-      if (!Number.isFinite(position) || sequence <= latestSeek) return;
+    const {action, position, sequence, volume, session} = event.data;
+    if (action === "requestArtwork") {
+      requestBrowserArtwork(event.data);
+      return;
+    } else if (action === "seek") {
+      if (typeof session === "string" && session !== seekSession) { seekSession = session; latestSeek = 0; }
+      if (!Number.isFinite(position) || !Number.isFinite(sequence) || sequence <= latestSeek) return;
       latestSeek = sequence;
       const engine = window.__octaveEngine;
       const audio = engine?.active;
@@ -175,7 +333,13 @@
       const key = {play: "play", pause: "pause", next: "nexttrack", previous: "previoustrack"}[action];
       if (key) handlers.get(key)?.();
     }
-    queueMicrotask(() => publish(true));
+    schedulePublish();
+    if (action === "refresh") queueMicrotask(() => {
+      const lyrics = lyricCache.get(lyricKey(playerStore?.getState?.().currentTrack));
+      if (lyrics) window.postMessage(lyrics, location.origin);
+      if (event.data.requestID) window.postMessage({source: "boring-notch-octave", type: "ready",
+        requestID: event.data.requestID}, location.origin);
+    });
   });
 
   // Capture lyrics supplied by Octave itself when its lyrics view requests them.
@@ -187,10 +351,24 @@
         try {
           const request = JSON.parse(args[1].body);
           const body = await response.clone().json();
+          const track = playerStore?.getState?.().currentTrack;
+          if (track && (request.id != null && request.id !== track.id || request.title !== track.title || request.artist !== track.artist?.name)) return;
           const lines = parseLyrics(body);
-          if (body.success && (lines.length || body.lyrics)) window.postMessage({source: "boring-notch-octave", type: "lyrics",
+          const message = {source: "boring-notch-octave", type: "lyrics",
             title: request.title, artist: request.artist, lines,
-            plainLyrics: !body.synced && !body.richSync?.length ? body.lyrics || "" : ""}, location.origin);
+            plainLyrics: !body.synced && !body.richSync?.length ? body.lyrics || "" : ""};
+          if (body.success && (lines.length || body.lyrics) && JSON.stringify(message).length <= 200000) {
+            if (track) {
+              lyricRequest?.abort();
+              lyricRequest = null;
+              ++lyricGeneration;
+              clearTimeout(lyricRetry);
+              lyricTrackID = lyricKey(track);
+              lyricCache.set(lyricTrackID, message);
+              if (lyricCache.size > 12) lyricCache.delete(lyricCache.keys().next().value);
+            }
+            window.postMessage(message, location.origin);
+          }
         } catch (_) {}
       }).catch(() => {});
     }
@@ -198,4 +376,9 @@
   };
 
   window.addEventListener("pageshow", () => publish(true));
+  window.addEventListener("online", () => {
+    if (lyricRequest === null && !lyricCache.has(lyricTrackID)) lyricTrackID = null;
+    schedulePublish();
+  });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) schedulePublish(); });
 })();

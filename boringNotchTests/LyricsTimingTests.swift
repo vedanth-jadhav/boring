@@ -47,13 +47,13 @@ final class LyricsTimingTests: XCTestCase {
         XCTAssertEqual(words.lastIndex { 11.1 >= $0.start && 11.1 < $0.end }, 1)
     }
 
-    func testLineOnlyTimingUsesWholeWindowAndUnicodeTokens() {
+    func testLineOnlyTokensShareTheKnownLineWindowWithoutGuessedWordTimes() {
         let line = LyricLine(start: 5, end: nil, text: "ਤੇਰਾ  ਮੇਰਾ\nਪਿਆਰ")
         let words = line.resolvedWords(until: 8)
         XCTAssertEqual(words.map(\.text), ["ਤੇਰਾ", "ਮੇਰਾ", "ਪਿਆਰ"])
         XCTAssertEqual(words.first?.start, 5)
         XCTAssertEqual(words.last!.end, 8, accuracy: 0.000001)
-        XCTAssertEqual(words[0].end, words[1].start)
+        XCTAssertTrue(words.allSatisfy { $0.start == 5 && $0.end == 8 })
         XCTAssertTrue(LyricLine(start: 0, end: nil, text: "").resolvedWords(until: 1).isEmpty)
     }
 

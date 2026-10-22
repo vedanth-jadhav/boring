@@ -12,11 +12,13 @@ const samples = [];
 const baseFetch = async (url, options) => {
   fetchCalls.push({url, options});
   const body = {success: true, synced: false, lyrics: 'A plain lyric'};
-  return {json: async () => body, clone() { return {json: async () => body}; }};
+  return {ok: true, json: async () => body, clone() { return {json: async () => body}; }};
 };
 const window = {addEventListener() {}, postMessage() {}, fetch: baseFetch};
 const sandbox = {window, navigator: {mediaSession: {setActionHandler() {}}},
+  URL,
   MediaSession: class {}, location: {origin: 'https://music.octavestreaming.com'},
+  document: {addEventListener() {}}, setTimeout, clearTimeout,
   queueMicrotask, setInterval(fn) {heartbeats.push(fn);}, AbortController, performance: {timeOrigin: 1000000, now: () => sampleTime}, console};
 Object.defineProperty(sandbox, 'fetch', {
   get: () => window.fetch,
@@ -79,23 +81,25 @@ const messages = [];
 const port = () => ({postMessage: message => messages.push(message), onMessage: {addListener() {}},
   onDisconnect: {addListener(fn) {disconnect = fn;}}});
 const chrome = {runtime: {connectNative: port, onMessage: {addListener(fn) {listener = fn;}}},
-  tabs: {onRemoved: {addListener() {}}, onUpdated: {addListener() {}}, sendMessage: async () => {}}};
+  webNavigation: {onCommitted: {addListener() {}}},
+  alarms: {get: async () => ({}), onAlarm: {addListener() {}}},
+  tabs: {query: async () => [], onRemoved: {addListener() {}}, onUpdated: {addListener() {}}, sendMessage: async () => ({accepted: true})}};
 vm.runInNewContext(fs.readFileSync('octave-brave-extension/background.js', 'utf8'),
-  {chrome, setTimeout(fn) {reconnect = fn;}, clearTimeout() {}});
+  {chrome, console, setInterval() {}, setTimeout(fn) {reconnect = fn;}, clearTimeout() {}});
 const sender = {tab: {id: 1, url: 'https://music.octavestreaming.com/'}};
-listener({type: 'state', title: 'Song', artist: 'Artist', playing: true}, sender);
+listener({type: 'state', title: 'Song', artist: 'Artist', playing: true, position: 0, duration: 100}, sender);
 const lyrics = {type: 'lyrics', title: 'Song', artist: 'Artist', lines: [{time: 1, text: 'Hello'}]};
 listener(lyrics, sender);
 messages.length = 0;
 disconnect(); reconnect();
 assert.deepEqual(messages.map(m => m.type), ['state', 'lyrics']);
-assert.deepEqual(messages[1], lyrics);
-listener({type: 'state', title: 'Other', artist: 'Artist', playing: true}, sender);
+assert.deepEqual(JSON.parse(JSON.stringify(messages[1])), lyrics);
+listener({type: 'state', title: 'Other', artist: 'Artist', playing: true, position: 0, duration: 100}, sender);
 messages.length = 0;
 disconnect(); reconnect();
 assert.deepEqual(messages.map(m => m.type), ['state']);
 setImmediate(() => {
-  verifyLyricsFetchRouting().then(() => {
+  verifyLyricsFetchRouting().then(async () => {
   const sample = samples.find(message => message.type === 'state');
   assert.equal(sample.sampledAt, 1000025.125);
   assert.equal(sample.position, 10.125);
@@ -111,6 +115,7 @@ setImmediate(() => {
   samples.length = 0;
   window.__octaveEngine.active.paused = true;
   audioListeners.get('pause')({type: 'pause'});
+  await Promise.resolve();
   assert.equal(samples.at(-1).playing, false);
   assert.equal(samples.at(-1).clockDiscontinuity, true);
   samples.length = 0;
@@ -119,15 +124,19 @@ setImmediate(() => {
   assert.equal(samples.length, 0, 'Paused playback needs no heartbeat');
   window.__octaveEngine.active.currentTime -= 0.025;
   audioListeners.get('seeked')({type: 'seeked'});
+  await Promise.resolve();
   assert.equal(samples.at(-1).position, window.__octaveEngine.active.currentTime);
   assert.equal(samples.at(-1).clockDiscontinuity, true, 'Even small seeks rebase immediately');
   window.__octaveEngine.active.paused = false;
   window.__octaveEngine.active.playbackRate = 2;
   audioListeners.get('ratechange')({type: 'ratechange'});
+  await Promise.resolve();
   assert.equal(samples.at(-1).rate, 2);
   audioListeners.get('waiting')({type: 'waiting'});
+  await Promise.resolve();
   assert.equal(samples.at(-1).rate, 0, 'Freeze the native clock while buffering');
   audioListeners.get('playing')({type: 'playing'});
+  await Promise.resolve();
   assert.equal(samples.at(-1).rate, 2);
   sampleTime += 5000;
   const previousCount = samples.length;

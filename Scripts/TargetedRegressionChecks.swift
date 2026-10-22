@@ -145,6 +145,8 @@ final class CredentialFixture: @unchecked Sendable {
         defer { bridge.stop() }
         func connect() throws -> Int32 {
             let descriptor = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+            var noSignal: Int32 = 1
+            setsockopt(descriptor, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout<Int32>.size))
             var address = sockaddr_un()
             address.sun_family = sa_family_t(AF_UNIX)
             let bytes = Array(path.utf8CString)
@@ -157,8 +159,8 @@ final class CredentialFixture: @unchecked Sendable {
             guard result == 0 else { Darwin.close(descriptor); throw NSError(domain: "socket", code: Int(errno)) }
             return descriptor
         }
-        func sendState(_ descriptor: Int32) {
-            let json = Data("{\"type\":\"state\",\"title\":\"Song\",\"artist\":\"Artist\",\"position\":12,\"duration\":100,\"playing\":true}\n".utf8)
+        func sendState(_ descriptor: Int32, title: String = "Song") {
+            let json = Data("{\"type\":\"state\",\"title\":\"\(title)\",\"artist\":\"Artist\",\"position\":12,\"duration\":100,\"playing\":true}\n".utf8)
             check(OctaveSocketWriter.writeAll(json, to: descriptor) == nil, "Playback fixture reaches the real Unix socket")
         }
         var peer = try connect()
@@ -172,6 +174,15 @@ final class CredentialFixture: @unchecked Sendable {
         sendState(peer)
         try await Task.sleep(for: .milliseconds(300))
         check(controller.playbackState.title == "Song", "Fresh playback cancels disconnect expiry")
+        let superseded = peer
+        peer = try connect()
+        sendState(peer, title: "Replacement")
+        try await Task.sleep(for: .milliseconds(100))
+        check(controller.playbackState.title == "Replacement", "A fresh host replaces a still-open old socket without waiting for EOF")
+        Darwin.close(superseded)
+        try await Task.sleep(for: .milliseconds(300))
+        check(controller.playbackState.title == "Replacement" && bridge.isConnected,
+              "Old-host disconnect callbacks cannot expire the replacement connection")
         check(OctaveSocketWriter.writeAll(Data("{\"type\":\"gone\"}\n".utf8), to: peer) == nil, "Explicit gone message reaches the socket")
         try await Task.sleep(for: .milliseconds(50))
         check(controller.playbackState.title.isEmpty, "Explicit nothing-playing clears immediately")
@@ -194,5 +205,14 @@ final class CredentialFixture: @unchecked Sendable {
         Darwin.close(peer)
         try await Task.sleep(for: .milliseconds(350))
         check(controller.playbackState.title.isEmpty && !controller.isActive(), "Sustained disconnect expires the retained playback")
+        peer = try connect()
+        sendState(peer)
+        try await Task.sleep(for: .milliseconds(50))
+        _ = OctaveSocketWriter.writeAll(Data(repeating: 120, count: 1_048_577), to: peer)
+        let oversizedDeadline = Date().addingTimeInterval(2)
+        while bridge.isConnected && Date() < oversizedDeadline { try await Task.sleep(for: .milliseconds(10)) }
+        check(disconnectReason?.contains("exceeded 1 MB") == true && !bridge.isConnected,
+              "Oversized incoming frames close the client before unbounded parsing")
+        Darwin.close(peer)
     }
 }

@@ -15,24 +15,13 @@ struct LyricLine: Equatable, Codable {
     var words: [Word] = []
     var isBackground: Bool = false
 
-    func resolvedWords(until fallbackEnd: Double, usePhoneticTiming: Bool = false) -> [Word] {
+    func resolvedWords(until fallbackEnd: Double) -> [Word] {
         if !words.isEmpty { return assigningVocalRoles(to: words) }
         let tokens = text.split(whereSeparator: \.isWhitespace).map(String.init)
         guard !tokens.isEmpty else { return [] }
         let finish = max(start + 0.1, end ?? fallbackEnd)
-        // South Asian lyrics use spoken syllables, independent of script or
-        // display romanization. Keep the existing paging of other LRC sources.
-        let weights = tokens.map {
-            usePhoneticTiming ? LyricPhoneticTiming.weight(of: $0) : Double(max(2, $0.count))
-        }
-        let total = weights.reduce(0, +)
-        var cursor = start
-        let estimated = tokens.indices.map { index in
-            let next = index == tokens.count - 1 ? finish : cursor + (finish - start) * weights[index] / total
-            defer { cursor = next }
-            return Word(text: tokens[index], start: cursor, end: next)
-        }
-        return assigningVocalRoles(to: estimated)
+        // These tokens carry only the known line window, never invented word times.
+        return tokens.map { Word(text: $0, start: start, end: finish, isBackground: isBackground) }
     }
 
     private func assigningVocalRoles(to words: [Word]) -> [Word] {

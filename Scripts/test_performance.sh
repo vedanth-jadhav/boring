@@ -11,7 +11,7 @@ trap 'rm -rf "$performance_test_dir"' EXIT
 python3 - "$performance_test_dir" <<'PY'
 from pathlib import Path
 import re, sys
-classes = ['LyricsTimingTests', 'LyricsPrecisionTests', 'LyricsServiceTimingTests', 'SpicyLyricsTests', 'PerformanceRegressionTests']
+classes = ['LyricsTimingTests', 'LyricsPrecisionTests', 'LyricMotionTests', 'LyricsServiceTimingTests', 'LyricsSourceTests', 'SpicyLyricsTests', 'PerformanceRegressionTests']
 sources = []
 runner = ['@main struct PerformanceTestRunner {', ' @MainActor static func main() async throws {',
           '  NSApplication.shared.setActivationPolicy(.prohibited)']
@@ -31,16 +31,19 @@ PY
 performance_objects=("$performance_binary_dir/Defaults.build/"*.o)
 /usr/bin/xcrun --sdk macosx swiftc -swift-version 5 -parse-as-library -D BORING_LOCAL_BUILD \
   -I "$performance_binary_dir/Modules" \
-  boringNotch/models/Lyric{Line,Timeline,VocalFrame,WordPhase,PlaybackClock,PhoneticTiming}.swift \
+  boringNotch/models/Lyric{Line,Timeline,VocalFrame,WordPhase,HandoffPhase,PlaybackClock,PhoneticTiming}.swift \
   boringNotch/models/LyricsRomanizer.swift boringNotch/models/RomanizationLexicon.swift boringNotch/managers/LyricsService.swift \
-  boringNotch/models/{LyricAttribution,SpicyLyricsPayload}.swift boringNotch/managers/SpicyLyricsClient.swift \
+  boringNotch/models/{LyricAttribution,LyricTrackQuery,SpicyLyricsPayload}.swift boringNotch/managers/SpicyLyricsClient.swift \
   boringNotch/helpers/LegacyKeychainAccess.swift boringNotch/helpers/SpicyLyricsCredential.swift \
   boringNotch/helpers/LyricsKeychainClient.swift Shared/LyricsKeychainProtocol.swift \
   boringNotch/managers/EnhancedLyricsSettingsModel.swift \
   boringNotch/MediaControllers/MediaAppBundleID.swift boringNotch/helpers/AppleScriptHelper.swift \
-  boringNotch/components/LiveActivities/LyricTextLayout.swift boringNotch/extensions/NSImage+Extensions.swift \
+  boringNotch/components/LiveActivities/{LyricTextLayout,LyricPaintLayer,LyricCanvasView,LyricPaintView,KaraokeLyricLineView}.swift \
+  boringNotch/extensions/NSImage+Extensions.swift \
   boringNotch/components/Music/MusicVisualizer.swift boringNotch/components/LiveActivities/NotchMusicState.swift \
   Scripts/PerformanceLifecycleChecks.swift Scripts/PerformanceTestSupport.swift "$performance_test_dir/Tests.swift" \
   "${performance_objects[@]}" -o "$performance_test_dir/checks"
 BORING_ROMANIZATION_RESOURCES="$PWD/boringNotch/Resources/Romanization" "$performance_test_dir/checks"
 node Scripts/test_octave_lyrics.cjs
+node Scripts/test_octave_bridge.cjs
+node Scripts/test_octave_native.cjs

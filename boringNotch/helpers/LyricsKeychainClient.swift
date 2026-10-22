@@ -26,7 +26,15 @@ enum LyricsKeychainClient {
             finish(.inaccessible(errSecNotAvailable))
         }) as? LyricsKeychainProtocol else { return .inaccessible(errSecNotAvailable) }
         proxy.perform(operation, value: value) { key, status in
-            if status == errSecSuccess { finish(.loaded(key ?? "")) }
+            if status == errSecSuccess {
+                if operation == "load" || operation == "authorize" {
+                    guard let key, SpicyLyricsCredential.accepts(key) else {
+                        finish(.inaccessible(errSecDecode))
+                        return
+                    }
+                    finish(.loaded(key.trimmingCharacters(in: .whitespacesAndNewlines)))
+                } else { finish(.loaded("")) }
+            }
             else if status == errSecItemNotFound { finish(.missing) }
             else { finish(.inaccessible(status)) }
         }

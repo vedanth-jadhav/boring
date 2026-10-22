@@ -102,6 +102,61 @@ capture Brave's audio utility process; macOS audio capture permission must be
 granted for the signed local app. Reload the unpacked extension at
 `brave://extensions` after changing its files.
 
+Bridge 1.3 skips snapshot construction on routine audio events between its
+five-second clock anchors and coalesces synchronous media-event bursts.
+It selects a 512px cover when available, reuses recently downloaded covers
+(24 entries, 16 MiB cache cost limit), and retries failed or invalid artwork
+without waiting for another playback event. Lyrics retain the 12 most recent
+tracks and have cancellable, timed, bounded retries. Reconnecting starts at
+250 ms and backs off to five seconds; closing the last media tab releases
+the native host. Worker restarts request fresh state and cached lyrics from
+existing tabs, and seek sequence numbers reset safely with a new app session.
+
+Run `node Scripts/test_octave_lyrics.cjs`, `node Scripts/test_octave_bridge.cjs`
+and `bash Scripts/test_octave_artwork.sh` for focused bridge checks. The optional
+`--benchmark` argument on `test_octave_bridge.cjs` compares snapshot construction
+against the current Git HEAD using the same 90-event fixture; this is a hot-path
+work count, not a measurement of total Brave CPU, RAM or network latency.
+
+Bridge 1.4 observes both audio decks during crossfades and handoffs. Tab
+selection follows playback changes rather than alternating on heartbeat
+arrival. Content delivery retains only the latest state, artwork and lyrics,
+waits for acknowledgement, and retries temporary worker failures. Document
+identity and sample order prevent late navigation updates from restoring stale
+playback; a fresh native host supersedes an old socket even if it remains open.
+A replaced browser profile waits for new playback before reconnecting, avoiding
+competing reconnect loops between profiles.
+
+Bridge 1.5 repairs missed pause/resume events, uses the current track store when
+Media Session metadata is missing or stale, and unfreezes a buffering clock when
+the audio starts advancing again. Content messages have a three-second
+acknowledgement deadline and retain the latest snapshot through prolonged
+failures, with retries capped at one every five seconds. A refresh handshake
+checks that the page observer actually responds. A browser alarm rediscovers
+Octave tabs every 30 seconds and reinstalls missing listeners without reloading
+the music; browser audibility changes also trigger rediscovery. While a tab is
+selected, a five-second watchdog checks for stale samples and probes the native
+app through the real socket. An unanswered probe reconnects after ten seconds.
+The alarm can be delayed by browser suspension or sleep; it is not a hard
+recovery deadline. After upgrading an existing 1.4 page observer, reload the
+extension and refresh Octave once to activate the new observer. Bridge 1.5 adds
+the `alarms` and `scripting` permissions, retaining its Octave-only site access.
+
+Bridge 1.5.1 keeps playback attached while browsing artists, albums and other
+Octave routes. A tab's loading status no longer retires its playing document.
+The `webNavigation` permission supplies confirmed top-frame document changes;
+old-document messages are rejected until that document is explicitly restored
+by back/forward navigation. URL changes also request a fresh playback snapshot.
+Reload the extension at `brave://extensions`, confirm version 1.5.1 (approve the
+navigation permission if Brave asks), then refresh the Octave tab once.
+
+Artwork starts with the current track's album covers and falls back through
+available URLs. Relative paths resolve against Octave. Browser-local covers
+use a page-side 512px thumbnail; slow native downloads can request the same
+bounded browser-cache fallback after 250 ms. Responses must match the current
+artwork request. Run `node Scripts/test_octave_native.cjs` for real Python-host
+framing, fragmented messages, EOF and buffer-limit checks.
+
 The local package has no Sparkle feed or update key and disables the updater UI.
 It cannot install upstream releases over this custom build. macOS may reject
 the self-signed app under Gatekeeper if it is quarantined after copying from
@@ -111,11 +166,11 @@ notarization.
 Lyrics are romanised by default for Hindi, Punjabi (Gurmukhi and Shahmukhi),
 and Urdu. Disable **Romanise Hindi, Punjabi and Urdu lyrics** under Media
 controls to read the original script. Octave's rich lyrics retain exact word
-start/end times for the white shimmer. Hindi, Hinglish, Punjabi and Urdu sources
-with only line timestamps use a syllable-weighted word shimmer. Its word times
-are approximate and stay within the source line window; other line-only sources
-keep their phrase sheen. Untimed lyrics display their first readable line and have no
-word highlight. Urdu spellings without written vowels may be approximate.
+start/end times for the white highlight. A word lights only inside its supplied
+timestamp interval; the light stops during vocal pauses. Sources with only line
+timestamps show a static readable phrase, without guessed word timing or a timed
+sweep. Untimed lyrics display their first readable line and have no word highlight.
+Urdu spellings without written vowels may be approximate.
 
 The shimmer follows each source word's audio phase directly, with a soft
 attack up to 120 ms, release up to 180 ms, and one broad eased reflection.

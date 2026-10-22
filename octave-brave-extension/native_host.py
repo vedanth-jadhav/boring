@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Native Messaging framing to the local Boring Notch Unix socket."""
-import json
 import os
 import select
 import socket
@@ -8,11 +7,15 @@ import struct
 import sys
 
 SOCKET = os.path.expanduser("~/Library/Application Support/BoringNotchLocal/octave.sock")
+MAX_MESSAGE = 1024 * 1024
 
 def read_exact(stream, length):
     result = bytearray()
     while len(result) < length:
-        chunk = os.read(stream.fileno(), length - len(result))
+        try:
+            chunk = os.read(stream.fileno(), length - len(result))
+        except InterruptedError:
+            continue
         if not chunk:
             return None
         result.extend(chunk)
@@ -44,7 +47,7 @@ def main():
                 report("browser closed native messaging input")
                 return
             size = struct.unpack("<I", header)[0]
-            if size > 1024 * 1024:
+            if size > MAX_MESSAGE:
                 report("browser message exceeded 1 MB")
                 return
             body = read_exact(sys.stdin.buffer, size)
@@ -60,8 +63,14 @@ def main():
             pending.extend(data)
             while b"\n" in pending:
                 line, _, pending = pending.partition(b"\n")
+                if len(line) > MAX_MESSAGE:
+                    report("app message exceeded 1 MB")
+                    return
                 if line:
                     write_exact(sys.stdout.buffer, struct.pack("<I", len(line)) + line)
+            if len(pending) > MAX_MESSAGE:
+                report("unterminated app message exceeded 1 MB")
+                return
 
 if __name__ == "__main__":
     try:

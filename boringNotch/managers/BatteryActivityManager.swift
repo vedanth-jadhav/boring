@@ -11,6 +11,7 @@ final class BatteryActivityManager {
     private var observers: [(BatteryEvent) -> Void] = []
     private var snapshotObservers: [(BatteryInfo) -> Void] = []
     private var previousBatteryInfo: BatteryInfo?
+    private var runtimeEstimator = BatteryRuntimeEstimator()
 
     enum BatteryEvent {
         case powerSourceChanged(isPluggedIn: Bool)
@@ -178,9 +179,9 @@ final class BatteryActivityManager {
                 throw BatteryError.batteryInfoUnavailable("No power sources available")
             }
 
-            let source = sources.first!
-
-            guard let description = IOPSGetPowerSourceDescription(snapshot, source)?.takeUnretainedValue() as? [String: Any] else {
+            guard let description = sources.compactMap({
+                IOPSGetPowerSourceDescription(snapshot, $0)?.takeUnretainedValue() as? [String: Any]
+            }).first(where: { ($0[kIOPSTypeKey] as? String) == kIOPSInternalBatteryType }) else {
                 throw BatteryError.batteryInfoUnavailable("Could not get power source description")
             }
 
@@ -197,25 +198,30 @@ final class BatteryActivityManager {
                 throw BatteryError.batteryParameterMissing("Power source state")
             }
 
+            let properties = getBatteryProperties()
+
             // Create battery info with the extracted parameters
             var batteryInfo = BatteryInfo(
                 isPluggedIn: powerSource == kIOPSACPowerValue,
                 isCharging: isCharging,
                 currentCapacity: currentCapacity,
-                maxCapacity: getBatteryHealthCapacity(),
+                maxCapacity: getBatteryHealthCapacity(properties),
                 isInLowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled,
                 timeToFullCharge: 0,
                 timeToDischarge: 0
             )
 
-            // Optional parameters
-            if let timeToFullCharge = description[kIOPSTimeToFullChargeKey] as? Int {
-                batteryInfo.timeToFullCharge = timeToFullCharge
-            }
-
-            if let timeToDischarge = description[kIOPSTimeToEmptyKey] as? Int {
-                batteryInfo.timeToDischarge = timeToDischarge
-            }
+            let times = runtimeEstimator.estimate(
+                properties: properties,
+                isPluggedIn: batteryInfo.isPluggedIn,
+                isCharging: isCharging,
+                systemTimeToEmpty: description[kIOPSTimeToEmptyKey] as? Int,
+                systemTimeToFull: description[kIOPSTimeToFullChargeKey] as? Int,
+                timestamp: Date.now.timeIntervalSince1970,
+                lowPowerMode: batteryInfo.isInLowPowerMode
+            )
+            batteryInfo.timeToDischarge = times.empty
+            batteryInfo.timeToFullCharge = times.full
 
             // Rated adapter wattage; nil on battery or unreported, stays 0
             if let adapterDetails = IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any],
@@ -239,41 +245,27 @@ final class BatteryActivityManager {
         }
     }
 
-    /// Reads the user-visible battery health capacity from the smart battery registry.
-    private func getBatteryHealthCapacity() -> Float? {
-        let batteryService = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
-        guard batteryService != IO_OBJECT_NULL else { return nil }
-        defer { IOObjectRelease(batteryService) }
-
+    /// One registry snapshot supplies both runtime and health, including newer nested telemetry.
+    private func getBatteryProperties() -> [String: Any] {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
+        guard service != IO_OBJECT_NULL else { return [:] }
+        defer { IOObjectRelease(service) }
         var properties: Unmanaged<CFMutableDictionary>?
-        guard IORegistryEntryCreateCFProperties(batteryService, &properties, kCFAllocatorDefault, 0) == KERN_SUCCESS,
-              let batteryProperties = properties?.takeRetainedValue() as? [String: Any],
-              let designCapacity = capacityValue(in: batteryProperties, forKey: "DesignCapacity"),
-              designCapacity > 0,
-              let fullChargeCapacity = capacityValue(in: batteryProperties, forKey: "NominalChargeCapacity")
-                ?? capacityValue(in: batteryProperties, forKey: "AppleRawMaxCapacity"),
-              fullChargeCapacity > 0 else {
-            return nil
+        guard IORegistryEntryCreateCFProperties(service, &properties, kCFAllocatorDefault, 0) == KERN_SUCCESS else {
+            return [:]
         }
-
-        let healthPercentage = (fullChargeCapacity / designCapacity) * 100
-        return min(max((healthPercentage / 5).rounded() * 5, 0), 100)
+        return properties?.takeRetainedValue() as? [String: Any] ?? [:]
     }
 
-    private func capacityValue(in properties: [String: Any], forKey key: String) -> Float? {
-        if let number = properties[key] as? NSNumber {
-            return number.floatValue
-        }
-        if let value = properties[key] as? Float {
-            return value
-        }
-        if let value = properties[key] as? Double {
-            return Float(value)
-        }
-        if let value = properties[key] as? Int {
-            return Float(value)
-        }
-        return nil
+    private func getBatteryHealthCapacity(_ properties: [String: Any]) -> Float? {
+        let data = properties["BatteryData"] as? [String: Any] ?? [:]
+        guard let design = BatteryRuntimeEstimator.positiveNumber(properties["DesignCapacity"])
+                ?? BatteryRuntimeEstimator.positiveNumber(data["DesignCapacity"]),
+              let full = BatteryRuntimeEstimator.positiveNumber(properties["NominalChargeCapacity"])
+                ?? BatteryRuntimeEstimator.positiveNumber(properties["AppleRawMaxCapacity"])
+                ?? BatteryRuntimeEstimator.positiveNumber(data["NominalChargeCapacity"])
+                ?? BatteryRuntimeEstimator.positiveNumber(data["FullChargeCapacity"]) else { return nil }
+        return Float(min(max(((full / design * 100) / 5).rounded() * 5, 0), 100))
     }
 
     /// Adds an observer to listen to battery changes

@@ -88,7 +88,8 @@ final class SpicyLyricsTests: XCTestCase {
     func testShimmerSettlesWithoutAnEndFlashAndRapStaysSteady() {
         let held = LyricLine.Word(text: "held", start: 1, end: 3)
         let onset = LyricWordPhase(word: held, elapsed: 1)
-        XCTAssertGreaterThan(onset.shimmerOpacity(at: 0), 0.9)
+        XCTAssertEqual(onset.shimmerOpacity(at: 0), 0.6)
+        XCTAssertGreaterThan(LyricWordPhase(word: held, elapsed: 1.04).shimmerOpacity(at: 0), 0.6)
         XCTAssertEqual(onset.shimmerOpacity(at: 1), 0.6)
         for position in [0.0, 0.25, 0.5, 0.75, 1] {
             XCTAssertEqual(LyricWordPhase(word: held, elapsed: 2.999).shimmerOpacity(at: position), 0.94, accuracy: 0.001)
